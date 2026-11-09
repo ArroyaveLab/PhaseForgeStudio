@@ -1,0 +1,23 @@
+{
+  "species": ["Al", "Ni"],
+  "lattices": ["FCC_A1"],
+  "calculator": "grace",
+  "device": "cpu",
+  "fmax": 0.01,
+  "t_min": 298.15,
+  "t_max": 6000.0,
+  "level": 1,
+  "md_temperature": 1000,
+  "md_pressure": 1,
+  "md_timestep": 1.0,
+  "md_scaling_matrix": 2,
+  "sro": false,
+  "bv": 0.005,
+  "phonon": false,
+  "open_calphad": false,
+  "terms": null,
+  "track_trajectory": true,
+  "path0": "~/Research",
+  "path1": "~/Research/BLADE",
+  "path2": "~/Research/PhaseForge/PhaseForge/atat/data/sqsdb"
+}

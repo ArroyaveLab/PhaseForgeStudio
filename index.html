@@ -1,0 +1,1985 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhaseForge Studio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.0.4/3Dmol-min.js" defer></script>
+<style>
+/* ── Design tokens ───────────────────────────────────────── */
+:root {
+  --bg:       #0D1117;
+  --bg2:      #161B22;
+  --bg3:      #1C2128;
+  --border:   #30363D;
+  --accent:   #E8A030;
+  --accent2:  #58A6FF;
+  --text:     #C9D1D9;
+  --text2:    #8B949E;
+  --green:    #3FB950;
+  --red:      #F85149;
+  --yellow:   #E3B341;
+  --teal:     #38B2A0;
+  --radius:   6px;
+  --panel:    280px;
+  --out-w:    320px;
+  --font:     "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --sans:     -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Top bar ────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  height: 44px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow: visible;
+  position: relative;
+  z-index: 100;
+}
+header h1 {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+header h1 span { color: var(--text2); font-weight: 400; }
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-family: var(--font);
+  color: var(--text2);
+  flex-shrink: 0;
+}
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--text2);
+  flex-shrink: 0;
+  transition: background .3s;
+}
+.dot.running { background: var(--green); animation: pulse 1.5s infinite; }
+.dot.done    { background: var(--accent2); }
+.dot.error   { background: var(--red); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+/* ── Stage pills ────────────────────────────────────────── */
+#stage-bar {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+  align-items: center;
+  min-width: 0;
+}
+#stage-bar::-webkit-scrollbar { display: none; }
+.stage-pill {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  font-family: var(--font);
+  font-size: 10px;
+  color: var(--text2);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color .2s, color .2s;
+}
+.stage-pill.running { border-color: var(--accent); color: var(--accent); }
+.stage-pill.done    { border-color: var(--green);  color: var(--green); }
+
+header .spacer { flex: 0 0 4px; }
+.btn {
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn:hover { border-color: var(--accent2); background: var(--bg2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+.btn.primary:hover { background: #d08c20; border-color: #d08c20; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: rgba(248,81,73,.12); }
+.btn:disabled { opacity: .4; cursor: default; pointer-events: none; }
+
+/* ── Three-panel body ───────────────────────────────────── */
+.panels {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Left: configure ────────────────────────────────────── */
+#panel-config {
+  width: var(--panel);
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.panel-title {
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 10px 14px 6px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.section { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.section-label {
+  font-size: 11px;
+  color: var(--text2);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.field { margin-bottom: 8px; }
+.field label { display: block; font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+input[type=text], input[type=number], select {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 4px 8px;
+  outline: none;
+  transition: border-color .15s;
+}
+input[type=text]:focus, input[type=number]:focus, select:focus { border-color: var(--accent2); }
+select option { background: var(--bg3); }
+
+/* ── Tag input ──────────────────────────────────────────── */
+.tag-input-wrap {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 4px; min-height: 32px;
+  cursor: text; transition: border-color .15s;
+}
+.tag-input-wrap:focus-within { border-color: var(--accent2); }
+.tag {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 6px;
+  font-family: var(--font); font-size: 11px; color: var(--accent);
+}
+.tag .rm { cursor: pointer; color: var(--text2); font-size: 13px; line-height: 1; opacity: .7; }
+.tag .rm:hover { color: var(--red); opacity: 1; }
+.tag-input-wrap input {
+  background: transparent; border: none; outline: none;
+  font-family: var(--font); font-size: 12px; color: var(--text);
+  min-width: 60px; flex: 1; padding: 0;
+}
+
+/* ── Lattice checkboxes ─────────────────────────────────── */
+.lattice-list { display: flex; flex-direction: column; gap: 4px; max-height: 120px; overflow-y: auto; }
+.lattice-item { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 4px; cursor: pointer; transition: background .1s; }
+.lattice-item:hover { background: var(--bg); }
+.lattice-item input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
+.lattice-item span { font-family: var(--font); font-size: 11px; color: var(--text); }
+
+/* ── Path fields ────────────────────────────────────────── */
+.path-field { display: flex; gap: 4px; align-items: center; }
+.path-field input { flex: 1; }
+.path-field .btn { padding: 4px 8px; font-size: 11px; white-space: nowrap; }
+
+/* ── Center: visualize ──────────────────────────────────── */
+#panel-viz {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg);
+}
+.viz-tabs {
+  display: flex; border-bottom: 1px solid var(--border); background: var(--bg2); flex-shrink: 0;
+}
+.tab {
+  padding: 8px 14px; font-size: 12px; color: var(--text2);
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab:hover:not(.active) { color: var(--text); }
+.tab-content { display: none; flex: 1; overflow: hidden; }
+.tab-content.active { display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── 3Dmol viewer ───────────────────────────────────────── */
+#viewer-wrap { flex: 1; position: relative; background: #0a0e14; min-height: 0; }
+#mol-viewer { width: 100%; height: 100%; }
+.viewer-hint {
+  position: absolute; bottom: 8px; right: 10px;
+  font-size: 10px; color: var(--text2); pointer-events: none;
+}
+#struct-label, #struct-source-label {
+  font-family: var(--font); font-size: 11px; color: var(--text2); margin-left: 4px;
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.viewer-controls {
+  display: flex; gap: 6px; padding: 6px 10px;
+  background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0;
+  flex-wrap: wrap; align-items: center;
+}
+.viewer-controls select { width: auto; }
+
+/* ── Trajectory controls ────────────────────────────────── */
+#traj-controls {
+  display: flex; gap: 6px; align-items: center;
+  padding: 4px 10px; background: var(--bg2); border-bottom: 1px solid var(--border);
+  flex-shrink: 0; flex-wrap: wrap;
+}
+#play-btn {
+  background: var(--bg3); border: 1px solid var(--border2, var(--border));
+  color: var(--accent); padding: 2px 8px; border-radius: 3px;
+  font-family: var(--font); font-size: 10px; cursor: pointer;
+}
+#frame-slider { accent-color: var(--teal); cursor: pointer; width: 120px; }
+#frame-label { font-family: var(--font); font-size: 10px; color: var(--teal); min-width: 70px; }
+#energy-chip {
+  font-family: var(--font); font-size: 10px; color: var(--text2);
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 1px 7px;
+}
+
+/* ── Energy chart ───────────────────────────────────────── */
+#chart-tab { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.energy-mode-bar {
+  display: flex; gap: 6px; padding: 6px 12px; background: var(--bg2);
+  border-bottom: 1px solid var(--border); flex-shrink: 0; align-items: center;
+}
+.energy-tab-btn {
+  font-family: var(--font); font-size: 10px; padding: 2px 8px;
+  border-radius: 3px; border: 1px solid var(--border);
+  background: transparent; color: var(--text2); cursor: pointer;
+  transition: border-color .1s, color .1s;
+}
+.energy-tab-btn.active { border-color: var(--accent); color: var(--accent); }
+.energy-tab-btn:hover:not(.active) { border-color: var(--text2); color: var(--text); }
+#chart-wrap { flex: 1; padding: 12px; min-height: 0; position: relative; }
+#chart-wrap canvas { max-height: 100%; }
+
+/* ── Log tab ────────────────────────────────────────────── */
+#log-tab { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#log-output {
+  flex: 1; font-family: var(--font); font-size: 11px; color: var(--text);
+  line-height: 1.6; overflow-y: auto; padding: 10px 14px;
+  white-space: pre-wrap; word-break: break-all;
+}
+#log-output .log-err  { color: var(--red); }
+#log-output .log-warn { color: var(--yellow); }
+#log-output .log-ok   { color: var(--green); }
+#log-output .log-info { color: var(--accent2); }
+#log-output .log-sys  { color: var(--accent); }
+.log-toolbar {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  background: var(--bg2); border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.log-toolbar label { font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+/* ── Phase diag tab ─────────────────────────────────────── */
+#tab-phasediag { overflow-y: auto; }
+#phasediag-grid { display: flex; flex-wrap: wrap; align-items: flex-start; padding: 10px; gap: 8px; }
+.phasediag-img { max-width: 100%; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: border-color .15s; }
+.phasediag-img:hover { border-color: var(--accent); }
+
+/* ── Right: outputs ─────────────────────────────────────── */
+#panel-out {
+  width: var(--out-w); flex-shrink: 0; background: var(--bg2);
+  border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;
+}
+#tdb-preview {
+  background: var(--bg3); border-top: 1px solid var(--border);
+  max-height: 200px; overflow-y: auto; padding: 8px 10px;
+  font-family: var(--font); font-size: 10px; color: var(--text);
+  white-space: pre; flex-shrink: 0; display: none;
+}
+#tdb-preview.visible { display: block; }
+
+/* ── Analysis panel ───────────────────────────────────────── */
+#analysis-panel { padding: 10px; border-top: 1px solid var(--border); flex-shrink: 0; }
+#analysis-panel h4 { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; margin: 0 0 8px; }
+.analysis-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+.analysis-row > label { font-size: 11px; color: var(--text2); min-width: 70px; }
+.analysis-row select { flex: 1; min-width: 80px; }
+#analysis-result table { border-collapse: collapse; width: 100%; }
+#analysis-result td { padding: 2px 6px; }
+#analysis-result td:first-child { color: var(--text2); }
+#analysis-result td:last-child { color: var(--text); font-family: var(--font); }
+
+/* ── File browser ───────────────────────────────────────── */
+#browser-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+.browser-entry {
+  display: flex; align-items: center; gap: 8px; padding: 4px 10px;
+  cursor: pointer; font-family: var(--font); font-size: 11px; color: var(--text);
+  border-left: 2px solid transparent; transition: background .1s; user-select: none;
+}
+.browser-entry:hover { background: var(--bg3); }
+.browser-entry.selected { border-left-color: var(--accent); background: var(--bg3); }
+.browser-entry.active-structure { border-left-color: var(--green); }
+.browser-icon { font-size: 13px; flex-shrink: 0; }
+.browser-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.browser-sub { font-size: 10px; color: var(--text2); flex-shrink: 0; }
+
+/* ── Modal ──────────────────────────────────────────────── */
+#modal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.88); z-index: 200;
+  align-items: center; justify-content: center; padding: 24px;
+}
+#modal.open { display: flex; }
+#modal img { max-width: 100%; max-height: 100%; border-radius: 4px; border: 1px solid var(--border); }
+
+/* ── Scrollbars ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 900px) { #panel-out { display: none; } }
+@media (max-width: 640px) { #panel-config { width: 220px; } }
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ───────────────────────────────────────────── -->
+<header>
+  <h1>PhaseForge <span>Studio</span></h1>
+  <div class="status-pill" onclick="toggleJobHistory()" title="Click to show job history" style="cursor:pointer;">
+    <div class="dot" id="state-dot"></div>
+    <span id="state-text">idle</span>
+    <span id="job-name-text" style="color:var(--teal);font-size:10px;margin-left:4px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    <span id="elapsed-text" style="color:var(--text2);font-size:10px;margin-left:2px;"></span>
+  </div>
+  <!-- Job history dropdown -->
+  <div id="job-history-panel" style="display:none;position:absolute;top:40px;left:12px;z-index:300;background:var(--bg2);border:1px solid var(--border);border-radius:6px;min-width:320px;max-height:300px;overflow-y:auto;padding:6px 0;">
+    <div style="padding:4px 12px 2px;font-size:10px;color:var(--text2);border-bottom:1px solid var(--border);margin-bottom:4px;">Job History</div>
+    <div id="job-history-list" style="font-family:var(--font);font-size:11px;"></div>
+  </div>
+  <div id="stage-bar">
+    <div class="stage-pill" id="stage-sqs">SQS</div>
+    <div class="stage-pill" id="stage-relax">Relax</div>
+    <div class="stage-pill" id="stage-tdb">TDB</div>
+    <div class="stage-pill" id="stage-phasediag">Phase Diag</div>
+  </div>
+  <span id="refresh-badge" style="font-family:var(--font);font-size:10px;color:var(--text2);flex-shrink:0;">— —</span>
+  <button class="btn" onclick="refreshAll()" title="Refresh outputs">↻ Refresh</button>
+  <button class="btn danger" id="btn-stop" onclick="stopJob()" disabled>Stop</button>
+  <button class="btn primary" id="btn-run" onclick="runJob()">Run</button>
+</header>
+
+<!-- ── Three panels ──────────────────────────────────────── -->
+<div class="panels">
+
+  <!-- ── Config panel ───────────────────────────────────── -->
+  <div id="panel-config">
+    <div class="panel-title">Configure</div>
+
+    <div class="section">
+      <div class="section-label">Species</div>
+      <div class="tag-input-wrap" id="species-wrap" onclick="document.getElementById('species-input').focus()">
+        <input id="species-input" type="text" placeholder="Add element…" autocomplete="off"
+               onkeydown="handleTagKey(event,'species')" style="width:auto">
+      </div>
+      <div style="font-size:10px;color:var(--text2);margin-top:3px;">Enter or comma to add</div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Lattices</div>
+      <div class="lattice-list" id="lattice-list">
+        <div style="color:var(--text2);font-size:11px;padding:4px;">Loading…</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Calculator</div>
+      <div class="field">
+        <label>Model</label>
+        <select id="calc-select" onchange="onCalcChange()">
+          <option>Loading…</option>
+        </select>
+      </div>
+      <div class="field" id="device-row" style="display:none">
+        <label>Device</label>
+        <select id="device-select" onchange="syncConfig()">
+          <option value="cpu">cpu</option>
+          <option value="cuda">cuda</option>
+          <option value="cuda:0">cuda:0</option>
+          <option value="mps">mps</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>fmax (eV/Å)</label>
+        <input type="number" id="fmax-input" value="0.01" step="0.001" min="0.001" max="1"
+               onchange="syncConfig()">
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Temperature Range</div>
+      <div class="field">
+        <label>T min (K)</label>
+        <input type="number" id="tmin-input" value="298.15" step="1" min="1" onchange="syncConfig()">
+      </div>
+      <div class="field">
+        <label>T max (K)</label>
+        <input type="number" id="tmax-input" value="6000" step="100" min="100" onchange="syncConfig()">
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">SQS Level</div>
+      <div class="field">
+        <input type="number" id="level-input" value="1" step="1" min="1" max="4" onchange="syncConfig()">
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">MD Settings</div>
+      <div class="field">
+        <label>Temperature (K)</label>
+        <input type="number" id="md-temp-input" value="1000" step="100" min="100" onchange="syncConfig()">
+      </div>
+      <div class="field">
+        <label>Pressure (atm)</label>
+        <input type="number" id="md-pressure-input" value="1" step="0.1" min="0" onchange="syncConfig()">
+      </div>
+      <div class="field">
+        <label>Timestep (fs)</label>
+        <input type="number" id="md-timestep-input" value="1.0" step="0.5" min="0.1" onchange="syncConfig()">
+      </div>
+      <div class="field">
+        <label>Supercell scale (x y z)</label>
+        <div style="display:flex;gap:3px;">
+          <input type="number" id="md-scaling-x" value="2" step="1" min="1" max="8" onchange="syncConfig()" style="width:38px;" title="x">
+          <input type="number" id="md-scaling-y" value="2" step="1" min="1" max="8" onchange="syncConfig()" style="width:38px;" title="y">
+          <input type="number" id="md-scaling-z" value="2" step="1" min="1" max="8" onchange="syncConfig()" style="width:38px;" title="z">
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Fit Options</div>
+      <div class="field">
+        <label>Bump value bv (eV)</label>
+        <input type="number" id="bv-input" value="0.005" step="0.001" min="0" onchange="syncConfig()">
+      </div>
+      <div class="field">
+        <label>terms.in <span style="color:var(--text2);font-size:10px;">(optional)</span></label>
+        <input type="text" id="terms-input" placeholder="e.g. 1 0&#10;2 0" onchange="syncConfig()" title="Raw terms.in content — leave blank for default">
+      </div>
+      <div class="field" style="display:flex;flex-direction:column;gap:6px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="sro-chk" onchange="syncConfig()" style="accent-color:var(--accent)">
+          Short-range order (SRO)
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="phonon-chk" onchange="syncConfig()" style="accent-color:var(--accent)">
+          Phonons (end members)
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="open-calphad-chk" onchange="syncConfig()" style="accent-color:var(--accent)">
+          Open Calphad format
+        </label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Paths</div>
+      <div class="field">
+        <label>BLADE (path1)</label>
+        <input type="text" id="path1-input" placeholder="~/Research/BLADE" onchange="syncConfig()">
+      </div>
+      <div class="field">
+        <label>sqsdb (path2)</label>
+        <input type="text" id="path2-input" placeholder="~/Research/PhaseForge/…/sqsdb" onchange="syncConfig()">
+      </div>
+    </div>
+
+    <div class="section" style="border:none;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text)">
+        <input type="checkbox" id="track-traj" checked onchange="syncConfig()" style="accent-color:var(--accent)">
+        Track trajectory
+      </label>
+      <div style="font-size:10px;color:var(--text2);margin-top:3px;padding-left:20px;">Save per-structure trajectory for playback</div>
+    </div>
+  </div>
+
+  <!-- ── Viz panel ──────────────────────────────────────── -->
+  <div id="panel-viz">
+    <div class="viz-tabs">
+      <div class="tab active" data-tab="structure" onclick="switchTab('structure')">Structure</div>
+      <div class="tab" data-tab="energy" onclick="switchTab('energy')">Energy</div>
+      <div class="tab" data-tab="phasediag" onclick="switchTab('phasediag')">Phase Diagrams</div>
+      <div class="tab" data-tab="log" onclick="switchTab('log')">Log</div>
+    </div>
+
+    <!-- Structure viewer -->
+    <div class="tab-content active" id="tab-structure">
+      <div class="viewer-controls">
+        <select id="style-select" onchange="applyStyle()" style="width:110px">
+          <option value="stick">Stick</option>
+          <option value="sphere">Sphere</option>
+          <option value="ball+stick" selected>Ball+Stick</option>
+          <option value="surface">Surface</option>
+        </select>
+        <select id="bg-select" onchange="applyBg()" style="width:90px">
+          <option value="#0a0e14" selected>Dark</option>
+          <option value="#ffffff">Light</option>
+          <option value="#1a1a2e">Navy</option>
+        </select>
+        <button class="btn" onclick="resetCamera()">Reset</button>
+        <button class="btn" onclick="loadStructure()">↻</button>
+        <span id="struct-source-label"></span>
+      </div>
+      <!-- Trajectory controls -->
+      <div id="traj-controls">
+        <button id="play-btn" onclick="trajPlay()">▶</button>
+        <input type="range" id="frame-slider" min="0" max="0" value="0" oninput="onFrameSlider(this.value)">
+        <span id="frame-label">Frame 0/0</span>
+        <select id="play-speed" style="width:auto;background:var(--bg3);border:1px solid var(--border);color:var(--text2);font-family:var(--font);font-size:10px;padding:2px 4px;border-radius:3px;">
+          <option value="400">0.5×</option>
+          <option value="200" selected>1×</option>
+          <option value="100">2×</option>
+          <option value="40">5×</option>
+          <option value="20">10×</option>
+        </select>
+        <span id="energy-chip"></span>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-family:var(--font);font-size:10px;color:var(--text2);user-select:none;">
+          <input type="checkbox" id="show-bonds-chk" checked onchange="setShowBonds(this.checked)" style="accent-color:var(--teal)"> Bonds
+        </label>
+        <input type="number" id="bond-cutoff" min="0.5" max="8" step="0.1" value="3.5"
+          oninput="setBondCutoff(parseFloat(this.value))" title="Max bond length (Å)"
+          style="width:46px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);font-family:var(--font);font-size:10px;padding:2px 4px;border-radius:3px;">
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-family:var(--font);font-size:10px;color:var(--red);user-select:none;">
+          <input type="checkbox" id="show-forces-chk" onchange="setShowForces(this.checked)" style="accent-color:var(--red)"> Forces
+        </label>
+        <button id="live-btn" onclick="toggleLiveMode()" title="Follow live relaxation" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:2px 8px;border-radius:3px;font-family:var(--font);font-size:10px;cursor:pointer;">⬤ Live</button>
+      </div>
+      <!-- Atom tooltip -->
+      <div id="atom-tooltip" style="display:none;position:fixed;z-index:200;background:rgba(10,16,26,0.92);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-family:var(--font);font-size:10px;color:var(--text);pointer-events:none;white-space:nowrap;"></div>
+      <div id="viewer-wrap">
+        <div id="mol-viewer"></div>
+        <div class="viewer-hint">scroll=zoom  drag=rotate  shift+drag=pan</div>
+        <div id="viewer-empty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:13px;">
+          No structure found — run pipeline or check path1
+        </div>
+      </div>
+    </div>
+
+    <!-- Energy chart -->
+    <div class="tab-content" id="tab-energy">
+      <div class="energy-mode-bar">
+        <span style="font-size:11px;color:var(--text2);margin-right:4px;">Mode:</span>
+        <button class="energy-tab-btn active" id="etab-all" onclick="switchEnergyTab('all')">all comps</button>
+        <button class="energy-tab-btn" id="etab-step" onclick="switchEnergyTab('step')">step (selected)</button>
+        <button class="energy-tab-btn" id="etab-system" onclick="switchEnergyTab('system')">all in system</button>
+        <span id="energy-comp-label" style="font-family:var(--font);font-size:10px;color:var(--accent);margin-left:8px;"></span>
+      </div>
+      <div id="chart-tab">
+        <div id="chart-wrap">
+          <canvas id="energy-chart"></canvas>
+        </div>
+        <div id="chart-empty" style="display:none;text-align:center;padding:40px;color:var(--text2);">
+          No energy data yet.
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase Diagrams -->
+    <div class="tab-content" id="tab-phasediag">
+      <div id="phasediag-grid">
+        <div id="phasediag-empty" style="color:var(--text2);font-size:13px;padding:20px;">No phase diagrams yet.</div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="tab-content" id="tab-log">
+      <div id="log-output"></div>
+      <div class="log-toolbar">
+        <label><input type="checkbox" id="autoscroll" checked> Auto-scroll</label>
+        <div style="flex:1"></div>
+        <button class="btn" onclick="clearLog()">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Files panel ───────────────────────────────────── -->
+  <div id="panel-out">
+    <div class="panel-title" style="display:flex;align-items:center;gap:6px;">
+      <span style="flex:1">Files</span>
+      <button class="btn" style="padding:2px 7px;font-size:10px;" onclick="browseLatest()" title="Jump to latest structure">Latest ↗</button>
+      <button class="btn" style="padding:2px 7px;font-size:10px;" onclick="browseRefresh()">↻</button>
+    </div>
+    <div id="browser-crumb" style="
+      display:flex;align-items:center;flex-wrap:wrap;gap:2px;
+      padding:4px 10px;border-bottom:1px solid var(--border);
+      font-family:var(--font);font-size:10px;color:var(--text2);
+      min-height:24px;flex-shrink:0;
+    "></div>
+    <div id="browser-list"></div>
+    <pre id="tdb-preview"></pre>
+
+    <!-- ── Analysis / Calculations panel ──────────────────── -->
+    <div id="analysis-panel">
+      <h4>Calculations</h4>
+      <div class="analysis-row">
+        <label>Analyzer</label>
+        <select id="analyzer-select" style="flex:1"></select>
+      </div>
+      <div class="analysis-row">
+        <label>Calculator</label>
+        <select id="analyzer-calc-select" style="flex:1"></select>
+      </div>
+      <div class="analysis-row">
+        <label>Structure</label>
+        <span id="analyzer-struct-label" style="font-size:11px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">(select from browser)</span>
+      </div>
+      <div class="analysis-row">
+        <label><input type="checkbox" id="analyzer-is-relaxed" checked> Pre-relaxed</label>
+        <button class="btn" id="run-analysis-btn" onclick="runAnalysis()" style="margin-left:auto;">▶ Run</button>
+      </div>
+      <div id="analysis-spinner" style="font-size:11px;color:var(--accent);display:none;margin-top:4px;">⏳ Running…</div>
+      <div id="analysis-error" style="color:#f87171;font-size:11px;margin-top:6px;display:none;"></div>
+      <div id="analysis-result" style="margin-top:10px;padding:8px;background:var(--bg2);border-radius:4px;font-size:11px;display:none;">
+        <table id="analysis-table" style="border-collapse:collapse;width:100%;"></table>
+        <canvas id="analysis-chart" style="display:none;width:100%;height:150px;margin-top:8px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /panels -->
+
+<!-- Full-image modal -->
+<div id="modal" onclick="closeModal()">
+  <img id="modal-img" src="" alt="plot">
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+let cfg = {};
+let species = [];
+let selectedLattices = new Set();
+let viewer = null;
+let energyChart = null;
+let sse = null;
+let jobState = "idle";
+let elapsedTimer = null;
+let jobStart = null;
+let calcMeta = {};
+
+// File browser state
+let browserPath = "";
+let activeStructurePath = "";
+
+// Trajectory state — in-memory frame array (BLADE pattern)
+let trajFrames = [];    // array of single-frame extxyz strings
+let trajData = null;    // legacy metadata {label, n_frames} — still used by label lookup
+let trajPlaying = false;
+let trajIdx = 0;
+let trajInterval = null;
+let playSpeedMs = 200;
+
+// Live structure state
+let liveMode = false;
+let liveInterval = null;
+let liveXYZPath = "";     // last trajectory.xyz path seen
+
+// Energy mode
+let energyTabMode = "all";
+let energyStepData = null;
+
+// Bottom strip
+let bottomVisible = true;
+
+// ── Init ───────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadConfig();
+  await Promise.all([loadCalculators(), loadLattices()]);
+  buildSpeciesTags();
+  applyConfigToForm();
+  initChart();
+  init3Dmol();
+  startSSE();
+  pollStatus();
+  browseDir("");
+  loadStructure();
+  loadPhaseDiagrams();
+  initAnalyzers();
+});
+
+// ── Config ─────────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const r = await fetch("/api/config");
+    cfg = await r.json();
+  } catch {
+    cfg = {};
+  }
+  species = Array.isArray(cfg.species) ? [...cfg.species] : ["Al", "Ni"];
+  selectedLattices = new Set(Array.isArray(cfg.lattices) ? cfg.lattices : ["FCC_A1"]);
+}
+
+function applyConfigToForm() {
+  setVal("calc-select", cfg.calculator || "grace");
+  setVal("device-select", cfg.device || "cpu");
+  setVal("fmax-input", cfg.fmax ?? 0.01);
+  setVal("tmin-input", cfg.t_min ?? 298.15);
+  setVal("tmax-input", cfg.t_max ?? 6000);
+  setVal("level-input", cfg.level ?? 1);
+  setVal("md-temp-input", cfg.md_temperature ?? 1000);
+  setVal("md-pressure-input", cfg.md_pressure ?? 1);
+  setVal("md-timestep-input", cfg.md_timestep ?? 1.0);
+  const sc = cfg.md_scaling_matrix;
+  const scArr = Array.isArray(sc) ? sc : [sc ?? 2, sc ?? 2, sc ?? 2];
+  setVal("md-scaling-x", scArr[0] ?? 2);
+  setVal("md-scaling-y", scArr[1] ?? 2);
+  setVal("md-scaling-z", scArr[2] ?? 2);
+  setVal("bv-input", cfg.bv ?? 0.005);
+  setVal("terms-input", cfg.terms || "");
+  document.getElementById("sro-chk").checked = cfg.sro === true;
+  document.getElementById("phonon-chk").checked = cfg.phonon === true;
+  document.getElementById("open-calphad-chk").checked = cfg.open_calphad === true;
+  setVal("path1-input", cfg.path1 || "");
+  setVal("path2-input", cfg.path2 || "");
+  document.getElementById("track-traj").checked = cfg.track_trajectory !== false;
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val;
+}
+
+async function syncConfig() {
+  cfg.calculator = document.getElementById("calc-select").value;
+  cfg.device = document.getElementById("device-select").value;
+  cfg.fmax = parseFloat(document.getElementById("fmax-input").value) || 0.01;
+  cfg.t_min = parseFloat(document.getElementById("tmin-input").value) || 298.15;
+  cfg.t_max = parseFloat(document.getElementById("tmax-input").value) || 6000;
+  cfg.level = parseInt(document.getElementById("level-input").value) || 1;
+  cfg.md_temperature = parseInt(document.getElementById("md-temp-input").value) || 1000;
+  cfg.md_pressure = parseFloat(document.getElementById("md-pressure-input").value) || 1;
+  cfg.md_timestep = parseFloat(document.getElementById("md-timestep-input").value) || 1.0;
+  const sx = parseInt(document.getElementById("md-scaling-x").value) || 2;
+  const sy = parseInt(document.getElementById("md-scaling-y").value) || 2;
+  const sz = parseInt(document.getElementById("md-scaling-z").value) || 2;
+  cfg.md_scaling_matrix = (sx === sy && sy === sz) ? sx : [sx, sy, sz];
+  cfg.bv = parseFloat(document.getElementById("bv-input").value) || 0.005;
+  const termsRaw = document.getElementById("terms-input").value.trim();
+  cfg.terms = termsRaw || null;
+  cfg.sro = document.getElementById("sro-chk").checked;
+  cfg.phonon = document.getElementById("phonon-chk").checked;
+  cfg.open_calphad = document.getElementById("open-calphad-chk").checked;
+  cfg.path1 = document.getElementById("path1-input").value;
+  cfg.path2 = document.getElementById("path2-input").value;
+  cfg.track_trajectory = document.getElementById("track-traj").checked;
+  cfg.species = [...species];
+  cfg.lattices = [...selectedLattices];
+  try {
+    await fetch("/api/config", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(cfg),
+    });
+  } catch {}
+}
+
+// ── Calculator dropdown ────────────────────────────────────
+async function loadCalculators() {
+  try {
+    const r = await fetch("/api/calculators");
+    const items = await r.json();
+    const sel = document.getElementById("calc-select");
+    if (items.length && typeof items[0] === "object") {
+      calcMeta = {};
+      items.forEach(c => { calcMeta[c.name] = c; });
+      sel.innerHTML = items.map(c => `<option value="${c.name}">${c.name}</option>`).join("");
+    } else {
+      sel.innerHTML = items.map(n => `<option value="${n}">${n}</option>`).join("");
+    }
+    if (cfg.calculator) sel.value = cfg.calculator;
+    onCalcChange(false);
+  } catch {}
+}
+
+function onCalcChange(doSync = true) {
+  const name = document.getElementById("calc-select").value;
+  const meta = calcMeta[name];
+  const deviceRow = document.getElementById("device-row");
+  if (deviceRow) deviceRow.style.display = (meta && meta.supports_device) ? "" : "none";
+  if (doSync) syncConfig();
+}
+
+// ── Lattice checkboxes ─────────────────────────────────────
+async function loadLattices() {
+  try {
+    const r = await fetch("/api/lattices");
+    const names = await r.json();
+    renderLattices(names);
+  } catch {
+    renderLattices(["BCC_A2", "FCC_A1", "LIQUID"]);
+  }
+}
+
+function renderLattices(names) {
+  const wrap = document.getElementById("lattice-list");
+  wrap.innerHTML = names.map(n => `
+    <label class="lattice-item">
+      <input type="checkbox" value="${n}" ${selectedLattices.has(n) ? "checked" : ""}
+             onchange="toggleLattice('${n}',this.checked)">
+      <span>${n}</span>
+    </label>
+  `).join("");
+}
+
+function toggleLattice(name, checked) {
+  if (checked) selectedLattices.add(name);
+  else selectedLattices.delete(name);
+  syncConfig();
+}
+
+// ── Species tag input ──────────────────────────────────────
+function buildSpeciesTags() {
+  const wrap = document.getElementById("species-wrap");
+  wrap.querySelectorAll(".tag").forEach(t => t.remove());
+  const input = document.getElementById("species-input");
+  species.forEach(el => {
+    const tag = document.createElement("div");
+    tag.className = "tag";
+    tag.innerHTML = `${el}<span class="rm" onclick="removeSpecies('${el}')">×</span>`;
+    wrap.insertBefore(tag, input);
+  });
+}
+
+function handleTagKey(e, type) {
+  if (type !== "species") return;
+  const input = document.getElementById("species-input");
+  if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+    e.preventDefault();
+    addSpecies(input.value);
+  } else if (e.key === "Backspace" && input.value === "" && species.length > 0) {
+    removeSpecies(species[species.length - 1]);
+  }
+}
+
+function addSpecies(raw) {
+  const el = raw.trim().replace(/,/g, "");
+  if (!el || species.includes(el)) { document.getElementById("species-input").value = ""; return; }
+  const norm = el.charAt(0).toUpperCase() + el.slice(1).toLowerCase();
+  species.push(norm);
+  document.getElementById("species-input").value = "";
+  buildSpeciesTags();
+  syncConfig();
+}
+
+function removeSpecies(el) {
+  species = species.filter(s => s !== el);
+  buildSpeciesTags();
+  syncConfig();
+}
+
+// ── Tabs ───────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  document.querySelectorAll(".tab-content").forEach(tc => {
+    tc.classList.toggle("active", tc.id === `tab-${name}`);
+  });
+  if (name === "energy") loadEnergies();
+  if (name === "phasediag") loadPhaseDiagrams();
+  if (name === "structure" && viewer) {
+    if (typeof viewer.resize === "function") viewer.resize();
+    viewer.render();
+  }
+}
+
+// ── Run / Stop ─────────────────────────────────────────────
+async function runJob() {
+  await syncConfig();
+  ["sqs","relax","tdb","phasediag"].forEach(s => markStage(s, null));
+  try {
+    const r = await fetch("/api/run", {method: "POST"});
+    const data = await r.json();
+    if (data.error) appendLog(`[error] ${data.error}`, "log-err");
+    else {
+      switchTab("log");
+      jobStart = Date.now();
+      startElapsedTimer();
+      // Show job name
+      const jn = document.getElementById("job-name-text");
+      if (jn && data.job_name) jn.textContent = data.job_name;
+    }
+  } catch (e) {
+    appendLog(`[error] ${e.message}`, "log-err");
+  }
+}
+
+async function stopJob() {
+  await fetch("/api/stop", {method: "POST"});
+}
+
+// ── Job history panel ──────────────────────────────────────
+let jobHistoryOpen = false;
+function toggleJobHistory() {
+  jobHistoryOpen = !jobHistoryOpen;
+  const panel = document.getElementById("job-history-panel");
+  if (!panel) return;
+  panel.style.display = jobHistoryOpen ? "block" : "none";
+  if (jobHistoryOpen) refreshJobHistory();
+}
+document.addEventListener("click", (e) => {
+  if (jobHistoryOpen && !e.target.closest(".status-pill") && !e.target.closest("#job-history-panel")) {
+    jobHistoryOpen = false;
+    const p = document.getElementById("job-history-panel");
+    if (p) p.style.display = "none";
+  }
+});
+async function refreshJobHistory() {
+  try {
+    const r = await fetch("/api/jobs");
+    const data = await r.json();
+    const list = document.getElementById("job-history-list");
+    if (!list) return;
+    const rows = [];
+    // Current job first
+    if (data.current && data.current.job_id) {
+      const c = data.current;
+      const stateColor = c.state === "running" ? "var(--green)" : c.state === "error" ? "var(--red)" : "var(--text2)";
+      rows.push(`<div style="padding:4px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <span style="color:var(--teal);font-weight:600;">${c.job_name || c.job_id}</span>
+        <span style="color:${stateColor};font-size:10px;">● ${c.state}${c.elapsed_s ? ` ${c.elapsed_s}s` : ''}</span>
+      </div>`);
+    }
+    if (!data.history || data.history.length === 0) {
+      if (!rows.length) rows.push(`<div style="padding:8px 12px;color:var(--text2);">No jobs yet</div>`);
+    } else {
+      data.history.forEach(j => {
+        const stateColor = j.state === "done" ? "var(--green)" : j.state === "error" ? "var(--red)" : "var(--text2)";
+        const elapsed = (j.start_time && j.end_time) ? `${Math.round(j.end_time - j.start_time)}s` : "";
+        rows.push(`<div style="padding:3px 12px;display:flex;justify-content:space-between;align-items:center;">
+          <span>${j.job_name || j.job_id}</span>
+          <span style="color:${stateColor};font-size:10px;">${j.state}${elapsed ? ` ${elapsed}` : ''}</span>
+        </div>`);
+      });
+    }
+    list.innerHTML = rows.join("");
+  } catch {}
+}
+
+// ── Status polling ─────────────────────────────────────────
+function _updateRefreshBadge(ok) {
+  const el = document.getElementById("refresh-badge");
+  if (!el) return;
+  if (!ok) { el.textContent = "server unreachable"; return; }
+  const now = new Date();
+  el.textContent = `updated ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+}
+
+function pollStatus() {
+  setInterval(async () => {
+    try {
+      const r = await fetch("/api/status");
+      const s = await r.json();
+      updateStatusUI(s.state);
+      _updateRefreshBadge(true);
+      // Sync job name if running (e.g. page reload mid-run)
+      if (s.state === "running" && s.job_name) {
+        const jn = document.getElementById("job-name-text");
+        if (jn && !jn.textContent) jn.textContent = s.job_name;
+      }
+    } catch { _updateRefreshBadge(false); }
+  }, 5000);
+}
+
+function updateStatusUI(state) {
+  if (state === jobState) return;
+  jobState = state;
+  const dot = document.getElementById("state-dot");
+  const text = document.getElementById("state-text");
+  dot.className = `dot ${state}`;
+  text.textContent = state;
+  document.getElementById("btn-run").disabled = state === "running";
+  document.getElementById("btn-stop").disabled = state !== "running";
+  if (state !== "running") {
+    stopElapsedTimer();
+    if (state === "done") {
+      appendLog("[studio] Done.", "log-ok");
+      refreshAll();
+    } else if (state === "error") {
+      appendLog("[studio] Job ended with error.", "log-err");
+    }
+  }
+}
+
+function startElapsedTimer() {
+  stopElapsedTimer();
+  elapsedTimer = setInterval(() => {
+    const s = Math.round((Date.now() - jobStart) / 1000);
+    document.getElementById("elapsed-text").textContent = `${s}s`;
+  }, 1000);
+}
+
+function stopElapsedTimer() {
+  if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+  document.getElementById("elapsed-text").textContent = "";
+}
+
+// ── SSE log stream ─────────────────────────────────────────
+function startSSE() {
+  if (sse) sse.close();
+  sse = new EventSource("/api/stream");
+  sse.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === "log") {
+        appendLog(msg.line);
+      } else if (msg.type === "status") {
+        updateStatusUI(msg.state);
+        if (msg.state === "done") refreshAll();
+      } else if (msg.type === "structure_updated") {
+        browseRefresh();
+        if (!activeStructurePath) browseLatest();
+      }
+    } catch {}
+  };
+  sse.onerror = () => { setTimeout(() => startSSE(), 3000); };
+}
+
+// ── Log helpers ────────────────────────────────────────────
+function appendLog(line, cls = null) {
+  const out = document.getElementById("log-output");
+  const div = document.createElement("div");
+  div.textContent = line;
+  if (!cls) {
+    const lo = line.toLowerCase();
+    if (lo.includes("error") || lo.includes("traceback") || lo.includes("exception")) cls = "log-err";
+    else if (lo.includes("warning") || lo.includes("warn")) cls = "log-warn";
+    else if (lo.startsWith("[studio]")) cls = "log-sys";
+    else if (lo.includes("complete") || lo.includes("done") || lo.includes("success")) cls = "log-ok";
+    else if (lo.includes("fitting") || lo.includes("relaxing") || lo.includes("step")) cls = "log-info";
+  }
+  if (cls) div.className = cls;
+  out.appendChild(div);
+  if (document.getElementById("autoscroll").checked) out.scrollTop = out.scrollHeight;
+
+  // Update stage pills from log keywords
+  const lo = line.toLowerCase();
+  if (lo.includes("copy") || (lo.includes("sqs") && !lo.includes("sqsdb"))) {
+    markStage("sqs", "running");
+  } else if (lo.includes("relax") || lo.includes("step") || lo.includes("fmax")) {
+    if (!lo.includes("done")) markStage("relax", "running");
+    else { markStage("sqs", "done"); markStage("relax", "done"); }
+  } else if (lo.includes("tdb") || lo.includes("solution model") || lo.includes("fitting")) {
+    markStage("relax", "done");
+    markStage("tdb", "running");
+  } else if (lo.includes("phase diagram") && !lo.includes("saved")) {
+    markStage("tdb", "done");
+    markStage("phasediag", "running");
+  } else if (lo.includes("phase diagram saved")) {
+    markStage("phasediag", "done");
+  } else if (lo.includes("pipeline complete")) {
+    markStage("tdb", "done");
+  }
+}
+
+function markStage(id, state) {
+  const el = document.getElementById("stage-" + id);
+  if (!el) return;
+  el.classList.remove("running", "done");
+  if (state) el.classList.add(state);
+}
+
+function clearLog() { document.getElementById("log-output").innerHTML = ""; }
+
+// ── Live structure following ───────────────────────────────
+function splitXYZFrames(text) {
+  const lines = text.split('\n');
+  const frames = [];
+  let i = 0;
+  while (i < lines.length) {
+    const s = lines[i].trim();
+    if (!s) { i++; continue; }
+    const n = parseInt(s);
+    if (isNaN(n) || n <= 0) { i++; continue; }
+    const end = i + 2 + n;
+    if (end > lines.length) break;
+    frames.push(lines.slice(i, end).join('\n'));
+    i = end;
+  }
+  return frames;
+}
+
+function toggleLiveMode() {
+  liveMode = !liveMode;
+  const btn = document.getElementById("live-btn");
+  if (liveMode) {
+    btn.style.color = "#F85149";
+    btn.style.borderColor = "#F85149";
+    btn.textContent = "⬤ Live";
+    startLivePoll();
+    // Show traj controls so slider is visible
+    const ctrl = document.getElementById("traj-controls");
+    ctrl.style.display = "flex";
+    switchTab("structure");
+  } else {
+    btn.style.color = "";
+    btn.style.borderColor = "";
+    btn.textContent = "⬤ Live";
+    stopLivePoll();
+  }
+}
+
+function startLivePoll() {
+  if (liveInterval) return;
+  liveInterval = setInterval(pollLiveStructure, 2000);
+  pollLiveStructure();
+}
+
+function stopLivePoll() {
+  if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
+}
+
+async function pollLiveStructure() {
+  if (!liveMode) return;
+  try {
+    const r = await fetch("/api/live_structure");
+    const d = await r.json();
+    if (!d.xyz) return;
+
+    switchTab("structure");
+
+    // If path changed, new relaxation started — reset frames
+    if (d.path !== liveXYZPath) {
+      trajFrames = [];
+      liveXYZPath = d.path;
+    }
+
+    // Use full_xyz (all frames) if available, otherwise single latest frame
+    const xyzText = d.full_xyz || d.xyz;
+    const frames = splitXYZFrames(xyzText);
+    if (frames.length > 0) {
+      _applyFrames(frames);
+    } else {
+      renderStructure(d.xyz, "xyz");
+    }
+
+    // Update source label
+    const srcLbl = document.getElementById("struct-source-label");
+    if (srcLbl && d.label) srcLbl.textContent = `live: ${d.label}`;
+  } catch {}
+}
+
+// ── 3Dmol structure viewer ─────────────────────────────────
+function init3Dmol() {
+  try {
+    if (typeof $3Dmol === "undefined") return;
+    const element = document.getElementById("mol-viewer");
+    if (!element) return;
+    viewer = $3Dmol.createViewer(element, {backgroundColor: "#0a0e14"});
+    viewer.render();
+  } catch (e) {
+    console.warn("3Dmol init failed:", e);
+  }
+}
+
+function renderStructure(text, format) {
+  if (!viewer) return;
+  const empty = document.getElementById("viewer-empty");
+  if (!text) { empty.style.display = "flex"; return; }
+  empty.style.display = "none";
+  try {
+    // Preserve camera between frames
+    const savedView = viewer._hasContent && viewer.getView ? viewer.getView() : null;
+    viewer.clear();
+    viewer._hasContent = true;
+    viewer.addModel(text, format || "xyz");
+    if (typeof viewer.setBondThresh === "function") viewer.setBondThresh(showBonds ? bondCutoff : 0);
+    applyStyle();
+    if (showForces && format === "xyz") _renderForceArrowsFromXYZ(text);
+    if (savedView) viewer.setView(savedView); else viewer.zoomTo();
+    viewer.render();
+    initAtomTooltip();
+  } catch (e) {
+    console.warn("renderStructure error:", e);
+  }
+}
+
+async function loadStructure() {
+  try {
+    const r = await fetch("/api/structure");
+    const data = await r.json();
+    const lbl = document.getElementById("struct-source-label");
+    if (lbl) lbl.textContent = data.label ? `${data.label}  (${data.source})` : "";
+    if (!data.structure) {
+      const empty = document.getElementById("viewer-empty");
+      if (empty) empty.style.display = "flex";
+      return;
+    }
+    const empty = document.getElementById("viewer-empty");
+    if (empty) empty.style.display = "none";
+    renderStructure(data.structure, data.format || "vasp");
+  } catch (e) {
+    console.error("loadStructure:", e);
+  }
+}
+
+function applyStyle() {
+  if (!viewer) return;
+  const style = document.getElementById("style-select").value;
+  viewer.setStyle({});
+  if (style === "stick") viewer.setStyle({}, {stick: {}});
+  else if (style === "sphere") viewer.setStyle({}, {sphere: {scale: 0.4}});
+  else if (style === "ball+stick") viewer.setStyle({}, {stick: {radius: 0.15}, sphere: {scale: 0.3}});
+  else if (style === "surface") {
+    viewer.setStyle({}, {stick: {radius: 0.1}});
+    viewer.addSurface($3Dmol.SurfaceType.VDW, {opacity: 0.6});
+  }
+  viewer.render();
+}
+
+function applyBg() {
+  if (!viewer) return;
+  const bg = document.getElementById("bg-select").value;
+  viewer.setBackgroundColor(bg);
+  document.getElementById("viewer-wrap").style.background = bg;
+  viewer.render();
+}
+
+function resetCamera() { if (viewer) { viewer.zoomTo(); viewer.render(); } }
+
+// ── Bonds / forces / atom tooltip ─────────────────────────
+let showBonds = true;
+let bondCutoff = 3.5;
+let showForces = false;
+
+function setShowBonds(val) {
+  showBonds = val;
+  if (trajFrames.length) showFrame(trajIdx); else applyStyle();
+}
+
+function setBondCutoff(val) {
+  bondCutoff = val;
+  if (trajFrames.length) showFrame(trajIdx);
+  else if (viewer && typeof viewer.setBondThresh === "function") { viewer.setBondThresh(val); viewer.render(); }
+}
+
+function setShowForces(val) {
+  showForces = val;
+  if (trajFrames.length) showFrame(trajIdx); else viewer && viewer.render();
+}
+
+function _renderForceArrowsFromXYZ(frameText) {
+  if (!viewer || !frameText) return;
+  const forces = parseExtxyzForces(frameText);
+  if (!forces) return;
+  const model = viewer.getModel(0);
+  if (!model) return;
+  const atoms3d = model.selectedAtoms({});
+  const fmax = forces.reduce((m, f) => Math.max(m, Math.sqrt(f.fx**2 + f.fy**2 + f.fz**2)), 0.001);
+  const scale = 2.0 / fmax;
+  forces.forEach((f, i) => {
+    if (!atoms3d[i]) return;
+    const a = atoms3d[i];
+    const mag = Math.sqrt(f.fx**2 + f.fy**2 + f.fz**2);
+    if (mag < 1e-6) return;
+    viewer.addArrow({
+      start: {x: a.x, y: a.y, z: a.z},
+      end:   {x: a.x + f.fx*scale, y: a.y + f.fy*scale, z: a.z + f.fz*scale},
+      color: "#FF4444", radius: 0.07, radiusRatio: 1.5,
+    });
+  });
+}
+
+function initAtomTooltip() {
+  if (!viewer) return;
+  const tooltip = document.getElementById("atom-tooltip");
+  viewer.setClickable({}, true, function(atom, v, event) {
+    if (!atom) { tooltip.style.display = "none"; return; }
+    const sym = atom.elem || atom.atom || "?";
+    const x = atom.x != null ? atom.x.toFixed(3) : "?";
+    const y = atom.y != null ? atom.y.toFixed(3) : "?";
+    const z = atom.z != null ? atom.z.toFixed(3) : "?";
+    tooltip.textContent = `${sym}  (${x}, ${y}, ${z}) Å`;
+    tooltip.style.display = "block";
+    tooltip.style.left = (event.clientX + 12) + "px";
+    tooltip.style.top  = (event.clientY - 8)  + "px";
+    setTimeout(() => { tooltip.style.display = "none"; }, 3000);
+  });
+}
+
+// ── Trajectory: in-memory frame system (BLADE pattern) ───────────────────
+
+function parseFrameEnergy(frameText) {
+  const lines = frameText.split('\n');
+  if (lines.length < 2) return null;
+  const m = lines[1].match(/energy\s*=\s*([-\d.eE+]+)/i);
+  if (!m) return null;
+  const nAtoms = parseInt(lines[0].trim());
+  const e = parseFloat(m[1]);
+  return (nAtoms > 0) ? e / nAtoms : e;
+}
+
+function parseExtxyzForces(frameText) {
+  const lines = frameText.split('\n');
+  if (lines.length < 2) return null;
+  const pm = lines[1].match(/Properties\s*=\s*(\S+)/i);
+  if (!pm) return null;
+  const props = pm[1].split(':');
+  let colOffset = 0, forcesOffset = -1;
+  for (let i = 0; i < props.length; i += 3) {
+    const name = props[i], count = parseInt(props[i + 2]) || 1;
+    if (name.toLowerCase() === 'forces') { forcesOffset = colOffset; break; }
+    colOffset += count;
+  }
+  if (forcesOffset < 0) return null;
+  const atoms = [];
+  for (let i = 2; i < lines.length; i++) {
+    const parts = lines[i].trim().split(/\s+/);
+    if (parts.length < forcesOffset + 3) continue;
+    atoms.push({ fx: parseFloat(parts[forcesOffset]), fy: parseFloat(parts[forcesOffset+1]), fz: parseFloat(parts[forcesOffset+2]) });
+  }
+  return atoms.length ? atoms : null;
+}
+
+function _syncSlider(idx) {
+  const sl = document.getElementById('frame-slider');
+  const lbl = document.getElementById('frame-label');
+  if (sl) { sl.max = Math.max(0, trajFrames.length - 1); sl.value = idx; }
+  if (lbl) lbl.textContent = `Frame ${idx + 1}/${trajFrames.length}`;
+}
+
+function showFrame(idx) {
+  if (!trajFrames.length) return;
+  idx = Math.max(0, Math.min(trajFrames.length - 1, idx));
+  trajIdx = idx;
+  const frameText = trajFrames[idx];
+  renderStructure(frameText, "xyz");
+  _syncSlider(idx);
+  const e = parseFrameEnergy(frameText);
+  const chip = document.getElementById("energy-chip");
+  if (chip) {
+    chip.style.display = e !== null ? "" : "none";
+    if (e !== null) chip.textContent = `E = ${e.toFixed(4)} eV/atom`;
+  }
+  _updateEnergyDot(idx);
+}
+
+function _updateEnergyDot(idx) {
+  if (!energyChart || !trajFrames.length) return;
+  const e = parseFrameEnergy(trajFrames[idx]);
+  if (energyChart.data.datasets[1]) {
+    energyChart.data.datasets[1].data = e !== null ? [{ x: idx, y: e }] : [];
+    energyChart.update('none');
+  }
+}
+
+function updateEnergyChartFromFrames() {
+  if (!energyChart || !trajFrames.length) return;
+  const energies = trajFrames.map(f => parseFrameEnergy(f));
+  energyChart.data.labels = energies.map((_, i) => i);
+  energyChart.data.datasets[0].data = energies.map(e => e ?? null);
+  if (energyChart.data.datasets[1]) energyChart.data.datasets[1].data = [];
+  const valid = energies.filter(e => e !== null);
+  if (valid.length) {
+    energyChart.options.scales.y.min = Math.min(...valid);
+    energyChart.options.scales.y.max = Math.max(...valid);
+  }
+  energyChart.update('none');
+}
+
+function _applyFrames(frames) {
+  if (!frames.length) return;
+  trajFrames = frames;
+  document.getElementById('traj-controls').style.display = 'flex';
+  // Only jump to latest frame when in live mode; otherwise keep current position
+  if (liveMode || trajIdx >= frames.length - 1) showFrame(frames.length - 1);
+  else _syncSlider(trajIdx);
+  updateEnergyChartFromFrames();
+}
+
+async function loadTrajData(label) {
+  try {
+    const r = await fetch(`/api/trajectory/xyz?label=${encodeURIComponent(label)}`);
+    if (!r.ok) { hideTrajControls(); return; }
+    const data = await r.json();
+    if (!data.xyz) { hideTrajControls(); return; }
+    trajData = { label };
+    const frames = splitXYZFrames(data.xyz);
+    if (frames.length > 0) _applyFrames(frames);
+    else hideTrajControls();
+  } catch { hideTrajControls(); }
+}
+
+function hideTrajControls() {
+  document.getElementById("traj-controls").style.display = "none";
+  trajFrames = [];
+  trajData = null;
+  if (trajPlaying) { clearInterval(trajInterval); trajPlaying = false; }
+  document.getElementById("play-btn").textContent = "▶";
+}
+
+function onFrameSlider(val) {
+  val = parseInt(val);
+  // User scrubbing away from last frame pauses live follow
+  if (liveMode && val < trajFrames.length - 1) {
+    liveMode = false;
+    const btn = document.getElementById("live-btn");
+    if (btn) { btn.style.color = ""; btn.style.borderColor = ""; }
+  }
+  // Dragging back to last frame re-enables live follow
+  if (!liveMode && val >= trajFrames.length - 1 && liveInterval) {
+    liveMode = true;
+    const btn = document.getElementById("live-btn");
+    if (btn) { btn.style.color = "#F85149"; btn.style.borderColor = "#F85149"; }
+  }
+  showFrame(val);
+}
+
+function trajPlay() {
+  if (trajPlaying) {
+    clearInterval(trajInterval);
+    trajPlaying = false;
+    document.getElementById("play-btn").textContent = "▶";
+    return;
+  }
+  if (!trajFrames.length) return;
+  trajPlaying = true;
+  document.getElementById("play-btn").textContent = "⏸";
+  const speed = parseInt(document.getElementById("play-speed").value) || playSpeedMs;
+  trajInterval = setInterval(() => {
+    if (!trajFrames.length) { clearInterval(trajInterval); trajPlaying = false; return; }
+    trajIdx = (trajIdx + 1) % trajFrames.length;
+    document.getElementById("frame-slider").value = trajIdx;
+    showFrame(trajIdx);
+  }, speed);
+}
+
+// ── Energy chart ───────────────────────────────────────────
+function initChart() {
+  try {
+    if (typeof Chart === "undefined") return;
+    const ctx = document.getElementById("energy-chart").getContext("2d");
+    energyChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [{
+          label: "Energy/atom (eV)",
+          data: [],
+          borderColor: "#E8A030",
+          backgroundColor: "rgba(232,160,48,0.08)",
+          borderWidth: 2,
+          pointRadius: 2,
+          fill: true,
+          tension: 0.3,
+        }, {
+          label: "Current frame",
+          data: [],
+          borderColor: "transparent",
+          backgroundColor: "#58A6FF",
+          pointRadius: 6,
+          pointStyle: "circle",
+          showLine: false,
+          parsing: {xAxisKey: "x", yAxisKey: "y"},
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {labels: {color: "#C9D1D9", font: {family: "monospace"}}},
+        },
+        scales: {
+          x: {ticks: {color: "#8B949E", maxTicksLimit: 10}, grid: {color: "#30363D"}},
+          y: {ticks: {color: "#8B949E"}, grid: {color: "#30363D"}},
+        },
+      },
+    });
+  } catch (e) { console.warn("Chart init failed:", e); }
+}
+
+function switchEnergyTab(mode) {
+  energyTabMode = mode;
+  document.getElementById("etab-all").classList.toggle("active", mode === "all");
+  document.getElementById("etab-step").classList.toggle("active", mode === "step");
+  document.getElementById("etab-system").classList.toggle("active", mode === "system");
+  loadEnergies();
+}
+
+async function loadEnergies() {
+  const compLabel = document.getElementById("energy-comp-label");
+  const label = trajData ? trajData.label : "";
+
+  if (energyTabMode === "step") {
+    if (!label) {
+      if (compLabel) compLabel.textContent = "(select a structure in Files panel)";
+      await renderAllEnergies();
+      return;
+    }
+    if (compLabel) compLabel.textContent = label;
+    try {
+      // Prefer trajectory.xyz (extxyz has per-step energy in comment line)
+      const r = await fetch(`/api/trajectory/xyz?label=${encodeURIComponent(label)}`);
+      if (r.ok) {
+        const d = await r.json();
+        if (d.xyz) {
+          const frames = splitXYZFrames(d.xyz);
+          if (frames.length) {
+            energyStepData = {
+              label,
+              steps: frames.map((_, i) => i),
+              energies: frames.map(f => parseFrameEnergy(f)),
+            };
+            renderStepEnergies(energyStepData);
+            return;
+          }
+        }
+      }
+      // Fall back to pkl
+      const r2 = await fetch(`/api/trajectory?label=${encodeURIComponent(label)}`);
+      if (!r2.ok) { await renderAllEnergies(); return; }
+      energyStepData = await r2.json();
+      renderStepEnergies(energyStepData);
+    } catch { await renderAllEnergies(); }
+
+  } else if (energyTabMode === "system") {
+    if (!label) {
+      if (compLabel) compLabel.textContent = "(select a structure in Files panel)";
+      await renderAllEnergies();
+      return;
+    }
+    if (compLabel) compLabel.textContent = `system (${label})`;
+    try {
+      const r = await fetch(`/api/energies/system?label=${encodeURIComponent(label)}`);
+      if (!r.ok) { await renderAllEnergies(); return; }
+      const d = await r.json();
+      if (!d.curves || !d.curves.length) { await renderAllEnergies(); return; }
+      renderSystemEnergies(d.curves);
+    } catch { await renderAllEnergies(); }
+
+  } else {
+    if (compLabel) compLabel.textContent = "";
+    await renderAllEnergies();
+  }
+}
+
+// Palette for multi-curve system view
+const _CURVE_COLORS = ["#E8A030","#58A6FF","#3FB950","#F85149","#A78BFA","#79C0FF","#FFA657","#FF7B72","#56D364","#D2A8FF"];
+
+async function renderAllEnergies() {
+  try {
+    const r = await fetch("/api/energies");
+    const data = await r.json();
+    const empty = document.getElementById("chart-empty");
+    if (!data.energies || data.energies.length === 0) {
+      document.getElementById("energy-chart").style.display = "none";
+      empty.style.display = "block";
+      return;
+    }
+    document.getElementById("energy-chart").style.display = "";
+    empty.style.display = "none";
+    if (!energyChart) return;
+    // Reset to single-dataset mode
+    energyChart.data.datasets = energyChart.data.datasets.slice(0, 2);
+    energyChart.data.labels = data.labels || [];
+    energyChart.data.datasets[0].label = "Final Energy (eV)";
+    energyChart.data.datasets[0].data = data.energies;
+    energyChart.data.datasets[0].borderColor = "#E8A030";
+    energyChart.data.datasets[0].backgroundColor = "rgba(232,160,48,0.08)";
+    energyChart.data.datasets[0].showLine = true;
+    energyChart.data.datasets[0].pointRadius = 4;
+    // Reset y-axis auto-scale
+    energyChart.options.scales.y.min = undefined;
+    energyChart.options.scales.y.max = undefined;
+    energyChart.update();
+  } catch {}
+}
+
+function renderStepEnergies(data) {
+  if (!data || !data.energies || !data.energies.length) { renderAllEnergies(); return; }
+  document.getElementById("energy-chart").style.display = "";
+  document.getElementById("chart-empty").style.display = "none";
+  if (!energyChart) return;
+  // Reset to single-dataset mode
+  energyChart.data.datasets = energyChart.data.datasets.slice(0, 2);
+  energyChart.data.labels = data.steps.map(i => `Step ${i}`);
+  energyChart.data.datasets[0].label = `eV/atom  (${data.label})`;
+  energyChart.data.datasets[0].data = data.energies;
+  energyChart.data.datasets[0].borderColor = "#E8A030";
+  energyChart.data.datasets[0].backgroundColor = "rgba(232,160,48,0.08)";
+  energyChart.data.datasets[0].showLine = true;
+  energyChart.data.datasets[0].pointRadius = 2;
+  // Auto-scale y to data range
+  const valid = data.energies.filter(e => e != null);
+  if (valid.length) {
+    energyChart.options.scales.y.min = Math.min(...valid);
+    energyChart.options.scales.y.max = Math.max(...valid);
+  } else {
+    energyChart.options.scales.y.min = undefined;
+    energyChart.options.scales.y.max = undefined;
+  }
+  energyChart.update();
+}
+
+function renderSystemEnergies(curves) {
+  document.getElementById("energy-chart").style.display = "";
+  document.getElementById("chart-empty").style.display = "none";
+  if (!energyChart) return;
+  // Max steps across all curves for x-axis
+  const maxSteps = Math.max(...curves.map(c => c.steps.length));
+  energyChart.data.labels = Array.from({length: maxSteps}, (_, i) => `Step ${i}`);
+  // Replace datasets (keep frame-marker dataset at index 1, rebuild from index 0)
+  const frameDot = energyChart.data.datasets[1];
+  energyChart.data.datasets = curves.map((c, i) => ({
+    label: c.label,
+    data: c.energies,
+    borderColor: _CURVE_COLORS[i % _CURVE_COLORS.length],
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    pointRadius: 1,
+    fill: false,
+    tension: 0.2,
+    showLine: true,
+  }));
+  if (frameDot) energyChart.data.datasets.push(frameDot);
+  // Auto-scale y
+  const allE = curves.flatMap(c => c.energies).filter(e => e != null);
+  if (allE.length) {
+    energyChart.options.scales.y.min = Math.min(...allE);
+    energyChart.options.scales.y.max = Math.max(...allE);
+  } else {
+    energyChart.options.scales.y.min = undefined;
+    energyChart.options.scales.y.max = undefined;
+  }
+  energyChart.update();
+}
+
+function updateEnergyHighlight(step) {
+  if (energyTabMode !== "step" || !energyChart || !energyStepData) return;
+  try {
+    energyChart.tooltip.setActiveElements([{datasetIndex: 0, index: step}], {x: 0, y: 0});
+    energyChart.update();
+  } catch {}
+}
+
+// ── File browser ───────────────────────────────────────────
+async function browseDir(rel) {
+  try {
+    const r = await fetch(`/api/browse?path=${encodeURIComponent(rel)}`);
+    const data = await r.json();
+    browserPath = data.path;
+    renderBreadcrumb(data.path);
+    renderBrowserList(data.entries);
+  } catch (e) { console.error("browseDir:", e); }
+}
+
+function renderBreadcrumb(path) {
+  const el = document.getElementById("browser-crumb");
+  const isRoot = !path || path === "/";
+  const parts = isRoot ? [] : path.split("/").filter(Boolean);
+  // Always start with root crumb
+  const crumbs = [{label: "⌂ root", path: ""}];
+  let accum = "";
+  for (const p of parts) {
+    accum = accum ? accum + "/" + p : p;
+    crumbs.push({label: p, path: accum});
+  }
+  el.innerHTML = crumbs.map((c, i) =>
+    i === crumbs.length - 1
+      ? `<span style="color:var(--text)">${c.label}</span>`
+      : `<span style="cursor:pointer;color:var(--accent2)" onclick="browseDir('${c.path}')">${c.label}</span><span style="color:var(--border)"> / </span>`
+  ).join("");
+}
+
+function renderBrowserList(entries) {
+  const list = document.getElementById("browser-list");
+  if (!entries.length) {
+    list.innerHTML = `<div style="padding:12px 10px;color:var(--text2);font-size:11px;">Empty</div>`;
+    return;
+  }
+  const icons = {dir:"📁",structure:"🔷",tdb:"📄",png:"🖼",energy:"⚡",trajectory:"🎞",file:"📃"};
+  list.innerHTML = entries.map(e => {
+    const icon = icons[e.kind] || "📃";
+    const sub = e.kind === "dir" ? "" : e.size < 1024 ? `${e.size}B` : `${(e.size/1024).toFixed(1)}K`;
+    const isActive = e.rel_path === activeStructurePath;
+    // Escape single quotes in rel_path and name for inline onclick
+    const rp = e.rel_path.replace(/'/g, "\\'");
+    const nm = e.name.replace(/'/g, "\\'");
+    return `<div class="browser-entry${isActive ? " active-structure" : ""}" data-rel="${e.rel_path.replace(/"/g,'&quot;')}" onclick="onBrowserClick('${rp}','${e.kind}','${nm}')">
+      <span class="browser-icon">${icon}</span>
+      <span class="browser-name" title="${e.name}">${e.name}</span>
+      ${sub ? `<span class="browser-sub">${sub}</span>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function fileUrl(relPath) {
+  // Encode each path segment but keep slashes as separators
+  return "/files/" + relPath.split("/").map(encodeURIComponent).join("/");
+}
+
+async function onBrowserClick(relPath, kind, name) {
+  if (kind === "dir") { browseDir(relPath); return; }
+  document.querySelectorAll(".browser-entry").forEach(e => e.classList.remove("selected"));
+  const esc = relPath.replace(/"/g,'&quot;');
+  const clicked = document.querySelector(`[data-rel="${esc}"]`);
+  if (clicked) clicked.classList.add("selected");
+
+  if (kind === "structure") {
+    activeStructurePath = relPath;
+    updateAnalyzerStructLabel();
+    try {
+      switchTab("structure");
+      await new Promise(res => requestAnimationFrame(res));
+      // Always convert server-side to XYZ for reliable 3Dmol rendering
+      const r = await fetch(`/api/convert_xyz?path=${encodeURIComponent(relPath)}`);
+      if (!r.ok) { console.error("fetch structure failed", r.status, relPath); return; }
+      const data = await r.json();
+      if (data.xyz && data.xyz.trim()) {
+        renderStructure(data.xyz, data.format || "xyz");
+        const lbl = document.getElementById("struct-source-label");
+        if (lbl) lbl.textContent = relPath.split("/").slice(-3).join("/");
+      }
+    } catch(e) { console.error("onBrowserClick structure:", e); }
+    // Load trajectory for this sqs_lev dir
+    const label = relPath.endsWith("CONTCAR") || relPath.endsWith("POSCAR")
+      ? relPath.split("/").slice(0, -1).pop()
+      : name;
+    await loadTrajData(label);
+    browseDir(browserPath); // refresh to show highlight
+    return;
+  }
+  if (kind === "tdb") {
+    try {
+      const r = await fetch(fileUrl(relPath));
+      const text = await r.text();
+      const preview = document.getElementById("tdb-preview");
+      preview.textContent = text.slice(0, 8000);
+      preview.classList.add("visible");
+    } catch {}
+    return;
+  }
+  if (kind === "png") { openModal(fileUrl(relPath)); return; }
+  if (kind === "energy") {
+    try {
+      const r = await fetch(fileUrl(relPath));
+      const text = await r.text();
+      alert(`Energy: ${text.trim()} eV`);
+    } catch {}
+    return;
+  }
+}
+
+async function browseLatest() {
+  try {
+    const r = await fetch("/api/structures");
+    const structs = await r.json();
+    if (!structs.length) return;
+    const latest = structs[0];
+    const parentDir = latest.rel_path.split("/").slice(0, -1).join("/");
+    await browseDir(parentDir);
+    await onBrowserClick(latest.rel_path, "structure", "CONTCAR");
+  } catch {}
+}
+
+async function browseRefresh() {
+  browseDir(browserPath || "");
+}
+
+// ── Phase diagrams tab ─────────────────────────────────────
+async function loadPhaseDiagrams() {
+  try {
+    const r = await fetch("/api/outputs");
+    const items = await r.json();
+    const pngs = items.filter(i => i.file_type === "png" && i.name.toLowerCase().includes("phase_diagram"));
+    const grid = document.getElementById("phasediag-grid");
+    const empty = document.getElementById("phasediag-empty");
+    if (!pngs.length) {
+      if (empty) empty.style.display = "";
+      grid.querySelectorAll("img").forEach(e => e.remove());
+      return;
+    }
+    if (empty) empty.style.display = "none";
+    grid.querySelectorAll("img").forEach(e => e.remove());
+    pngs.forEach(p => {
+      const img = document.createElement("img");
+      img.className = "phasediag-img";
+      img.src = fileUrl(p.rel_path);
+      img.alt = p.name;
+      img.onclick = () => openModal(img.src);
+      grid.appendChild(img);
+    });
+  } catch {}
+}
+
+// ── Modal ──────────────────────────────────────────────────
+function openModal(src) {
+  document.getElementById("modal-img").src = src;
+  document.getElementById("modal").classList.add("open");
+}
+
+function closeModal() {
+  document.getElementById("modal").classList.remove("open");
+}
+
+// ── Refresh all ────────────────────────────────────────────
+function refreshAll() {
+  browseRefresh();
+  loadStructure();
+  loadPhaseDiagrams();
+  if (document.getElementById("tab-energy").classList.contains("active")) loadEnergies();
+  _updateRefreshBadge(true);
+}
+
+// ── Analysis / Calculations panel ──────────────────────────
+let analyzerInfo = {};
+let analysisChart = null;
+
+async function initAnalyzers() {
+  try {
+    const r = await fetch("/api/analyzers");
+    analyzerInfo = await r.json();
+    const sel = document.getElementById("analyzer-select");
+    sel.innerHTML = Object.entries(analyzerInfo).map(([k, v]) =>
+      `<option value="${k}" title="${v.description}">${v.label}</option>`
+    ).join("");
+    const calcSel = document.getElementById("analyzer-calc-select");
+    // Load from server for full list; fallback hardcoded
+    let calcs = ["grace","orb","mace","sevennet","chgnet","m3gnet","mattersim",
+                 "alignn","alphanet","deepmd","eqv2","eqnorm","esen","equflash",
+                 "gptff","hienet","matris","megnet","nequip","nequix","newtonnet",
+                 "petmad","posegnn","tace","uma","vasp","random"];
+    try {
+      const cr = await fetch("/api/calculators");
+      const cd = await cr.json();
+      if (Array.isArray(cd) && cd.length) calcs = cd.map(c => c.name || c);
+    } catch {}
+    calcSel.innerHTML = calcs.map(c =>
+      `<option value="${c}"${c === "grace" ? " selected" : ""}>${c}</option>`
+    ).join("");
+  } catch(e) { console.warn("initAnalyzers:", e); }
+}
+
+function updateAnalyzerStructLabel() {
+  const lbl = document.getElementById("analyzer-struct-label");
+  if (!lbl) return;
+  lbl.textContent = activeStructurePath
+    ? activeStructurePath.split("/").slice(-3).join("/")
+    : "(select from browser)";
+}
+
+async function runAnalysis() {
+  const spinner = document.getElementById("analysis-spinner");
+  const errDiv  = document.getElementById("analysis-error");
+  const resultDiv = document.getElementById("analysis-result");
+  errDiv.style.display = "none";
+  resultDiv.style.display = "none";
+  if (!activeStructurePath) {
+    errDiv.textContent = "Select a structure from the file browser first.";
+    errDiv.style.display = "block";
+    return;
+  }
+  spinner.style.display = "block";
+  document.getElementById("run-analysis-btn").disabled = true;
+  try {
+    const analyzer   = document.getElementById("analyzer-select").value;
+    const calculator = document.getElementById("analyzer-calc-select").value;
+    const is_relaxed = document.getElementById("analyzer-is-relaxed").checked;
+    const r = await fetch("/api/analyze", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ rel_path: activeStructurePath, analyzer, calculator, is_relaxed }),
+    });
+    const data = await r.json();
+    if (data.error) {
+      errDiv.textContent = data.error;
+      errDiv.style.display = "block";
+      return;
+    }
+    renderAnalysisResult(data, analyzerInfo[analyzer]);
+    resultDiv.style.display = "block";
+  } catch(e) {
+    errDiv.textContent = "Request failed: " + e.message;
+    errDiv.style.display = "block";
+  } finally {
+    spinner.style.display = "none";
+    document.getElementById("run-analysis-btn").disabled = false;
+  }
+}
+
+function renderAnalysisResult(data, info) {
+  const table = document.getElementById("analysis-table");
+  const chartCanvas = document.getElementById("analysis-chart");
+  const skip = new Set(["analyzer","volumes","energies","c_a_list","energy_list","gsfe_curve","traceback"]);
+  table.innerHTML = Object.entries(data)
+    .filter(([k]) => !skip.has(k))
+    .map(([k, v]) => {
+      const val = typeof v === "number" ? v.toFixed(5) : String(v);
+      return `<tr><td style="color:var(--text2);padding:2px 6px;">${k}</td><td style="font-family:var(--font);padding:2px 6px;">${val}</td></tr>`;
+    }).join("");
+  if (analysisChart) { analysisChart.destroy(); analysisChart = null; }
+  if (info && info.chart === "ev" && data.volumes && data.energies) {
+    chartCanvas.style.display = "block";
+    const pts = data.volumes.map((v, i) => ({x: v, y: data.energies[i]})).sort((a, b) => a.x - b.x);
+    analysisChart = new Chart(chartCanvas.getContext("2d"), {
+      type: "scatter",
+      data: { datasets: [{ data: pts, showLine: true, borderColor: "#38bdf8", borderWidth: 1.5, pointRadius: 3, fill: false }] },
+      options: { scales: { x: { title: { display: true, text: "V (Å³)" } }, y: { title: { display: true, text: "E (eV)" } } }, plugins: { legend: { display: false } } },
+    });
+  } else if (info && info.chart === "bain" && data.c_a_list && data.energy_list) {
+    chartCanvas.style.display = "block";
+    const pts = data.c_a_list.map((v, i) => ({x: v, y: data.energy_list[i]}));
+    analysisChart = new Chart(chartCanvas.getContext("2d"), {
+      type: "scatter",
+      data: { datasets: [{ data: pts, showLine: true, borderColor: "#a78bfa", borderWidth: 1.5, pointRadius: 3, fill: false }] },
+      options: { scales: { x: { title: { display: true, text: "c/a" } }, y: { title: { display: true, text: "E (eV)" } } }, plugins: { legend: { display: false } } },
+    });
+  } else if (info && info.chart === "gsfe" && data.gsfe_curve) {
+    chartCanvas.style.display = "block";
+    const pts = data.gsfe_curve.map(p => ({x: p.displacement_fraction, y: p.gamma_mJ_m2}));
+    analysisChart = new Chart(chartCanvas.getContext("2d"), {
+      type: "scatter",
+      data: { datasets: [{ data: pts, showLine: true, borderColor: "#34d399", borderWidth: 1.5, pointRadius: 3, fill: false }] },
+      options: { scales: { x: { title: { display: true, text: "Displacement" } }, y: { title: { display: true, text: "γ (mJ/m²)" } } }, plugins: { legend: { display: false } } },
+    });
+  } else {
+    chartCanvas.style.display = "none";
+  }
+}
+
+</script>
+</body>
+</html>

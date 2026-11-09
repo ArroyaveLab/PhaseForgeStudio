@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Config with local paths (user copies config.json.example)
+config.json
+
+# Job outputs and large data
+Jobs/
+Files/
+
+# ATAT / MaterialsFramework local installs
+MaterialsFramework/
+PhaseForge/
+PhaseForgePlus/
+lammps/
+new-models/
+
+# Misc
+*.log
+*.pkl
+*.xyz
+.DS_Store
+pyqsa_website.txt
