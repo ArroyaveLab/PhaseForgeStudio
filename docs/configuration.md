@@ -19,6 +19,9 @@ PhaseForge Studio is configured via `config.json` (copy from `config.json.exampl
 | `path0` | str | — | Research root directory |
 | `path1` | str | — | BLADE staging directory |
 | `path2` | str | — | sqsdb base directory |
+| `blade_path1` | str | — | BLADE staging directory for the BLADE workspace; defaults to `path1` when blank |
+| `blade_toml` | str | `"examples/full_framework.toml"` | TOML config path pre-filled in the BLADE Config tab |
+| `active_workspace` | str | `"phaseforge"` | Persisted workspace selection (`"phaseforge"` or `"blade"`) |
 
 ## Example
 
@@ -36,6 +39,9 @@ PhaseForge Studio is configured via `config.json` (copy from `config.json.exampl
   "track_trajectory": true,
   "path0": "~/Research",
   "path1": "~/Research/BLADE",
-  "path2": "~/Research/PhaseForge/PhaseForge/atat/data/sqsdb"
+  "path2": "~/Research/PhaseForge/PhaseForge/atat/data/sqsdb",
+  "blade_path1": "",
+  "blade_toml": "examples/full_framework.toml",
+  "active_workspace": "phaseforge"
 }
 ```

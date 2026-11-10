@@ -27,3 +27,14 @@ Switch modes with the tab buttons above the chart:
 ## Phase diagrams
 
 Click a `.tdb` file in the Outputs panel → click **Generate Phase Diagram**. For N-component systems, all C(N,2) pseudo-binary sections are generated and saved as PNGs alongside the TDB file.
+
+## BLADE workspace
+
+Click the **BLADE** tab in the header to switch to the full BLADE pipeline dashboard. The BLADE dashboard loads in an embedded frame and shows the same SQS, TDB, Plots, and Config views as the standalone BLADE dashboard server.
+
+Configure the BLADE workspace in the Configure panel:
+
+- **BLADE path1** — the BLADE staging directory (`Files/`, jobs, logs); defaults to your PhaseForge `path1` if left blank
+- **BLADE TOML config** — relative path to the TOML config file pre-filled in the Config tab (default: `examples/full_framework.toml`)
+
+Click the **Config** tab inside the BLADE view to load and edit your `full_framework.toml` settings as a structured form. Changes are written back to the file on disk without altering comments or formatting.

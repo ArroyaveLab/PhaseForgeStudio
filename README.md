@@ -17,6 +17,7 @@ Browser-based dashboard for [MaterialsFramework](https://github.com/dogusariturk
 - **Analysis Panel** — 14 MaterialsFramework analyzers (EOS, elastic constants, formation energy, Bain path, USFE, phonon, surface, NEB, …)
 - **Job History** — readable job names (`AlNiFe BCC_A2 #1`), clickable history panel, `updated HH:MM:SS` badge
 - **Phase Diagram Preview** — renders PNG outputs from TDB fitting inline
+- **BLADE Workspace** — switch to the full BLADE dashboard (SQS, TDB, Plots, Config tabs) in-browser via the workspace tab strip; runs as an embedded iframe served from the same process
 
 ## Quick start
 
@@ -63,6 +64,9 @@ ssh -L 8080:localhost:8080 <hpc-host>
 | `track_trajectory` | `true` | Write per-step extxyz during relaxation |
 | `path1` | — | BLADE staging directory |
 | `path2` | — | sqsdb base directory |
+| `blade_path1` | — | BLADE staging directory when BLADE workspace is active; defaults to `path1` when unset |
+| `blade_toml` | `"examples/full_framework.toml"` | Relative TOML config path pre-filled in the BLADE Config tab |
+| `active_workspace` | `"phaseforge"` | Last active workspace (`"phaseforge"` or `"blade"`); persisted across reloads |
 
 ## API routes
 
@@ -88,6 +92,21 @@ ssh -L 8080:localhost:8080 <hpc-host>
 | `/api/convert_xyz` | GET | POSCAR → extxyz conversion |
 | `/api/phase_diagram` | GET | Generate phase diagram PNGs from a TDB |
 | `/files/<rel>` | GET | Serve file from path1 |
+| `/api/switch_workspace` | POST | Persist `active_workspace` to config |
+| `/blade/` | GET | BLADE dashboard HTML (all `/api/` calls rewritten to `/blade/api/`) |
+| `/blade/api/status` | GET | BLADE pipeline stage status |
+| `/blade/api/sqs` | GET | SQS run tiles |
+| `/blade/api/structure` | GET | ATAT structure as XYZ |
+| `/blade/api/trajectory` | GET | Live trajectory XYZ |
+| `/blade/api/compositions` | GET | Composition list with stage flags |
+| `/blade/api/energy` | GET | Energy convergence for a composition |
+| `/blade/api/plots` | GET | Output plot listing |
+| `/blade/api/image` | GET | Serve image from BLADE Files/ |
+| `/blade/api/live_trajectory` | GET | Most recently modified trajectory |
+| `/blade/api/log` | GET | Last N lines of nohup.out |
+| `/blade/api/toml` | GET | Raw TOML config text |
+| `/blade/api/toml_read` | GET | Parsed TOML as JSON |
+| `/blade/api/toml_write` | POST | Patch TOML key(s) in-place, preserving comments |
 
 ## Requirements
 
