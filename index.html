@@ -448,8 +448,11 @@ select option { background: var(--bg3); }
   <button class="btn primary" id="btn-run" onclick="runJob()">Run</button>
 </header>
 
+<!-- ── BLADE iframe (shown when BLADE workspace active) ──── -->
+<iframe id="blade-frame" src="/blade/" style="display:none;flex:1;border:none;width:100%;height:100%;background:var(--bg);"></iframe>
+
 <!-- ── Three panels ──────────────────────────────────────── -->
-<div class="panels">
+<div class="panels" id="pf-panels">
 
   <!-- ── Config panel ───────────────────────────────────── -->
   <div id="panel-config">
@@ -837,8 +840,24 @@ async function switchWorkspace(workspace) {
     });
     cfg.active_workspace = workspace;
     _applyWorkspaceTabs(workspace);
-    refreshAll();
+    _applyWorkspaceView(workspace);
   } catch {}
+}
+
+function _applyWorkspaceView(workspace) {
+  const iframe = document.getElementById("blade-frame");
+  const panels = document.getElementById("pf-panels");
+  if (!iframe || !panels) return;
+  if (workspace === "blade") {
+    panels.style.display = "none";
+    iframe.style.display = "flex";
+    // Reload iframe so it picks up fresh data
+    iframe.src = "/blade/";
+  } else {
+    iframe.style.display = "none";
+    panels.style.display = "flex";
+    refreshAll();
+  }
 }
 
 async function loadConfig() {
@@ -876,7 +895,9 @@ function applyConfigToForm() {
   setVal("blade-path1-input", cfg.blade_path1 || "");
   setVal("path2-input", cfg.path2 || "");
   document.getElementById("track-traj").checked = cfg.track_trajectory !== false;
-  _applyWorkspaceTabs(cfg.active_workspace || "phaseforge");
+  const ws = cfg.active_workspace || "phaseforge";
+  _applyWorkspaceTabs(ws);
+  _applyWorkspaceView(ws);
 }
 
 function setVal(id, val) {

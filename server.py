@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64 as _b64
 import json
 import sys
 import threading
@@ -60,6 +61,20 @@ from phaseforge_studio import (  # noqa: E402
     scan_latest_structure,
     scan_outputs,
     scan_structures,
+)
+from phaseforge_studio.blade import (  # noqa: E402
+    _blade_cached,
+    _build_elem_map,
+    find_live_trajectory,
+    infer_stage_status,
+    parse_atat_structure,
+    read_log_tail,
+    scan_compositions,
+    scan_comps,
+    scan_energy,
+    scan_plots,
+    scan_sqs,
+    serve_blade_index,
 )
 from phaseforge_studio.config import _server_dir  # noqa: E402
 
@@ -230,6 +245,122 @@ class StudioHandler(BaseHTTPRequestHandler):
 
         elif path == "/api/live_structure":
             self._json(get_live_structure(_resolve(self.cfg, "path1")))
+
+        elif path in ("/blade", "/blade/", "/blade/index.html"):
+            blade_root = _resolve(self.cfg, "path1") if self.cfg.get("active_workspace") == "blade" else Path(self.cfg.get("blade_path1", "")).expanduser().resolve()
+            blade_idx = blade_root / "dashboard" / "index.html"
+            if not blade_idx.is_file():
+                self._json({"error": "BLADE dashboard not found — set blade_path1 in config"}, 404)
+                return
+            data = serve_blade_index(blade_idx)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+
+        elif path.startswith("/blade/api/"):
+            blade_root = Path(self.cfg.get("blade_path1", "")).expanduser().resolve()
+            files_dir = blade_root / "Files"
+            blade_path = path[len("/blade"):]  # strip /blade prefix → /api/...
+            blade_qs = qs
+
+            if blade_path == "/api/status":
+                sqs   = _blade_cached("sqs",    4,  lambda: scan_sqs(files_dir))
+                comps = _blade_cached("comps",  4,  lambda: scan_comps(files_dir))
+                stages = _blade_cached("stages", 4, lambda: infer_stage_status(files_dir))
+                self._json({"stages": stages, "sqs": sqs, "systems": comps, "timestamp": time.time()})
+
+            elif blade_path == "/api/sqs":
+                self._json(_blade_cached("sqs", 4, lambda: scan_sqs(files_dir)))
+
+            elif blade_path == "/api/structure":
+                file_path = blade_qs.get("path", [None])[0]
+                if not file_path:
+                    self._json({"error": "missing path"}, 400)
+                    return
+                p = Path(file_path)
+                if not p.exists():
+                    self._json({"error": "not found"}, 404)
+                    return
+                elem_map = _build_elem_map(p.parent / "rndstr.in")
+                xyz = parse_atat_structure(p.read_text(errors="ignore"), elem_map)
+                self._json({"xyz": xyz, "path": str(p)})
+
+            elif blade_path == "/api/trajectory":
+                file_path = blade_qs.get("path", [None])[0]
+                if not file_path:
+                    self._json({"error": "missing path"}, 400)
+                    return
+                p = Path(file_path)
+                if not p.exists():
+                    self._json({"error": "not found"}, 404)
+                    return
+                self._json({"xyz": p.read_text(errors="ignore"), "path": str(p)})
+
+            elif blade_path == "/api/compositions":
+                dir_path = blade_qs.get("dir", [None])[0]
+                if not dir_path:
+                    self._json({"error": "missing dir"}, 400)
+                    return
+                self._json(scan_compositions(Path(dir_path)))
+
+            elif blade_path == "/api/energy":
+                dir_path = blade_qs.get("dir", [None])[0]
+                if not dir_path:
+                    self._json({"error": "missing dir"}, 400)
+                    return
+                self._json(scan_energy(Path(dir_path)))
+
+            elif blade_path == "/api/plots":
+                self._json(_blade_cached("plots", 30, lambda: scan_plots(files_dir)))
+
+            elif blade_path == "/api/image":
+                file_path = blade_qs.get("path", [None])[0]
+                if not file_path:
+                    self._json({"error": "missing path"}, 400)
+                    return
+                p = Path(file_path)
+                if not p.exists():
+                    self._json({"error": "not found"}, 404)
+                    return
+                ext = p.suffix.lower()
+                mime = "image/gif" if ext == ".gif" else "image/png"
+                b64 = _b64.b64encode(p.read_bytes()).decode()
+                self._json({"data": b64, "mime": mime, "name": p.name})
+
+            elif blade_path == "/api/live_trajectory":
+                result = find_live_trajectory(files_dir, blade_root)
+                if result and result.get("path"):
+                    p = Path(result["path"])
+                    self._json({
+                        "xyz": p.read_text(errors="ignore"),
+                        "path": result["path"],
+                        "mtime": result["mtime"],
+                        "live": result.get("live", True),
+                        "nsteps": result.get("nsteps"),
+                        "converged": result.get("converged"),
+                        "composition": p.parent.name,
+                    })
+                else:
+                    self._json({"xyz": None, "path": None, "search_dirs": (result or {}).get("_search_dirs", [])})
+
+            elif blade_path == "/api/log":
+                log_path = blade_root / "nohup.out"
+                self._json({"lines": read_log_tail(log_path if log_path.exists() else None)})
+
+            elif blade_path == "/api/config":
+                self._json({
+                    "files_dir": str(files_dir),
+                    "blade_root": str(blade_root),
+                    "elements": {},
+                    "tdb": {},
+                    "stages": {},
+                })
+
+            else:
+                self._json({"error": "not found"}, 404)
 
         elif path.startswith("/files/"):
             rel = unquote(path[len("/files/") :])
