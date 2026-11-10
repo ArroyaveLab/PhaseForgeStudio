@@ -31,6 +31,7 @@ _default_config: dict[str, Any] = {
     "path1": "",
     "path2": "",
     "blade_path1": "",
+    "blade_toml": "",
     "active_workspace": "phaseforge",
     "device": "cpu",
 }

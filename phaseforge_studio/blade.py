@@ -415,10 +415,26 @@ def find_live_trajectory(files_dir: Path | None, blade_root: Path | None = None)
     return {"_search_dirs": [str(d) for d in search_dirs]}
 
 
-def serve_blade_index(blade_index_path: Path) -> bytes:
-    """Read BLADE's index.html and rewrite /api/ → /blade/api/ for all fetch calls."""
+def serve_blade_index(blade_index_path: Path, toml_path: str = "") -> bytes:
+    """Read BLADE's index.html and rewrite /api/ → /blade/api/ for all fetch calls.
+
+    If toml_path is given, inject a script that pre-fills the TOML path input.
+    """
     text = blade_index_path.read_text(encoding="utf-8")
     text = text.replace("fetch('/api/", "fetch('/blade/api/")
     text = text.replace('fetch("/api/', 'fetch("/blade/api/')
     text = text.replace("fetch(`/api/", "fetch(`/blade/api/")
+    if toml_path:
+        import html as _html
+
+        escaped = _html.escape(toml_path, quote=True)
+        inject = (
+            f'<script>window.addEventListener("DOMContentLoaded",function(){{'
+            f'var el=document.getElementById("toml-path-input");'
+            f'if(el&&!el.value){{el.value="{escaped}";}}'
+            f"}});</script>"
+        )
+        text = text.replace("</body>", inject + "\n</body>", 1)
+        if "</body>" not in text:
+            text += inject
     return text.encode("utf-8")

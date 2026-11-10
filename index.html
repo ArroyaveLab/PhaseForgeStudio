@@ -578,6 +578,10 @@ select option { background: var(--bg3); }
         <input type="text" id="blade-path1-input" placeholder="~/Research/BLADE" onchange="syncConfig()">
       </div>
       <div class="field">
+        <label>BLADE TOML config</label>
+        <input type="text" id="blade-toml-input" placeholder="examples/full_framework.toml" onchange="syncConfig()">
+      </div>
+      <div class="field">
         <label>sqsdb (path2)</label>
         <input type="text" id="path2-input" placeholder="~/Research/PhaseForge/…/sqsdb" onchange="syncConfig()">
       </div>
@@ -893,6 +897,7 @@ function applyConfigToForm() {
   document.getElementById("open-calphad-chk").checked = cfg.open_calphad === true;
   setVal("path1-input", cfg.path1 || "");
   setVal("blade-path1-input", cfg.blade_path1 || cfg.path1 || "");
+  setVal("blade-toml-input", cfg.blade_toml || "");
   setVal("path2-input", cfg.path2 || "");
   document.getElementById("track-traj").checked = cfg.track_trajectory !== false;
   const ws = cfg.active_workspace || "phaseforge";
@@ -927,6 +932,7 @@ async function syncConfig() {
   cfg.open_calphad = document.getElementById("open-calphad-chk").checked;
   cfg.path1 = document.getElementById("path1-input").value;
   cfg.blade_path1 = document.getElementById("blade-path1-input").value;
+  cfg.blade_toml = document.getElementById("blade-toml-input").value;
   cfg.path2 = document.getElementById("path2-input").value;
   cfg.track_trajectory = document.getElementById("track-traj").checked;
   cfg.species = [...species];

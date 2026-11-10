@@ -256,7 +256,7 @@ class StudioHandler(BaseHTTPRequestHandler):
             if not blade_idx.is_file():
                 self._json({"error": "BLADE dashboard not found — set blade_path1 in config"}, 404)
                 return
-            data = serve_blade_index(blade_idx)
+            data = serve_blade_index(blade_idx, toml_path=self.cfg.get("blade_toml", ""))
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
@@ -366,6 +366,23 @@ class StudioHandler(BaseHTTPRequestHandler):
                         "stages": {},
                     }
                 )
+
+            elif blade_path == "/api/toml":
+                rel = blade_qs.get("path", [""])[0]
+                if not rel:
+                    self._json({"error": "missing path"}, 400)
+                    return
+                # Resolve relative to blade_root; also accept absolute paths under blade_root
+                candidate = Path(rel)
+                if not candidate.is_absolute():
+                    candidate = (blade_root / rel).resolve()
+                if not str(candidate).startswith(str(blade_root)):
+                    self._json({"error": "forbidden"}, 403)
+                    return
+                if not candidate.is_file():
+                    self._json({"error": "not found"}, 404)
+                    return
+                self._json({"content": candidate.read_text(errors="ignore"), "path": str(candidate)})
 
             else:
                 self._json({"error": "not found"}, 404)
