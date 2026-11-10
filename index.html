@@ -2161,8 +2161,9 @@ async function runAnalysis() {
     });
     const data = await r.json();
     if (data.error) {
-      errDiv.textContent = data.error;
+      errDiv.textContent = data.error + (data.traceback ? "\n\n" + data.traceback : "");
       errDiv.style.display = "block";
+      errDiv.style.whiteSpace = "pre-wrap";
       return;
     }
     renderAnalysisResult(data, analyzerInfo[analyzer]);
