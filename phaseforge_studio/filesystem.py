@@ -217,17 +217,18 @@ def scan_outputs(path1: Path) -> list[dict[str, Any]]:
                         "size": tdb.stat().st_size,
                     }
                 )
-        for png in sorted(root.rglob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True):
-            with contextlib.suppress(OSError):
-                results.append(
-                    {
-                        "name": png.name,
-                        "rel_path": str(png.relative_to(path1)),
-                        "file_type": "png",
-                        "mtime": png.stat().st_mtime,
-                        "size": png.stat().st_size,
-                    }
-                )
+        for img_glob in ("*.png", "*.gif"):
+            for img in sorted(root.rglob(img_glob), key=lambda p: p.stat().st_mtime, reverse=True):
+                with contextlib.suppress(OSError):
+                    results.append(
+                        {
+                            "name": img.name,
+                            "rel_path": str(img.relative_to(path1)),
+                            "file_type": img.suffix.lstrip(".").lower(),
+                            "mtime": img.stat().st_mtime,
+                            "size": img.stat().st_size,
+                        }
+                    )
     return results
 
 
@@ -274,7 +275,7 @@ def browse_path(path1: Path, rel: str) -> dict[str, Any]:
             kind = "structure"
         elif ext == ".tdb":
             kind = "tdb"
-        elif ext == ".png":
+        elif ext in (".png", ".gif"):
             kind = "png"
         elif item.name == "energy":
             kind = "energy"
