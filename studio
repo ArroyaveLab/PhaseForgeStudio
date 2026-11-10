@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Launch PhaseForge Studio using the BLADE pixi venv (has numpy/ase/pycalphad/MF).
+BLADE_PYTHON="/Users/chasekatz/Desktop/School/Research/BLADE/.venv/bin/python"
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/server.py"
+exec "$BLADE_PYTHON" "$SCRIPT" "$@"

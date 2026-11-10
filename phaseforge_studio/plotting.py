@@ -126,16 +126,26 @@ def _phase_diagram_from_tdb(
         results: list[Path] = []
         try:
             if _plot_phase_gif(
-                dbf, all_els, phases, gif_path,
-                t_start=t_min, t_end=t_max, t_step=t_step,
+                dbf,
+                all_els,
+                phases,
+                gif_path,
+                t_start=t_min,
+                t_end=t_max,
+                t_step=t_step,
             ):
                 results.append(gif_path)
         except Exception:
             pass
         try:
             if _plot_phase_overlay(
-                dbf, all_els, phases, overlay_path,
-                t_start=t_min, t_end=t_max, t_step=t_step,
+                dbf,
+                all_els,
+                phases,
+                overlay_path,
+                t_start=t_min,
+                t_end=t_max,
+                t_step=t_step,
             ):
                 results.append(overlay_path)
         except Exception:

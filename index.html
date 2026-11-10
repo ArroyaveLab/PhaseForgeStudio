@@ -892,7 +892,7 @@ function applyConfigToForm() {
   document.getElementById("phonon-chk").checked = cfg.phonon === true;
   document.getElementById("open-calphad-chk").checked = cfg.open_calphad === true;
   setVal("path1-input", cfg.path1 || "");
-  setVal("blade-path1-input", cfg.blade_path1 || "");
+  setVal("blade-path1-input", cfg.blade_path1 || cfg.path1 || "");
   setVal("path2-input", cfg.path2 || "");
   document.getElementById("track-traj").checked = cfg.track_trajectory !== false;
   const ws = cfg.active_workspace || "phaseforge";

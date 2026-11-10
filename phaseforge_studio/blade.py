@@ -39,9 +39,32 @@ def blade_cache_clear() -> None:
 # ---------------------------------------------------------------------------
 
 _ALPHA_ELEMS = [
-    "Al", "Ba", "Ca", "Cr", "Cu", "Fe", "Ga", "Hf", "In", "Ir",
-    "K",  "La", "Mn", "Na", "Os", "Pd", "Pt", "Re", "Si", "Ti",
-    "U",  "V",  "W",  "Xe", "Y",  "Zr",
+    "Al",
+    "Ba",
+    "Ca",
+    "Cr",
+    "Cu",
+    "Fe",
+    "Ga",
+    "Hf",
+    "In",
+    "Ir",
+    "K",
+    "La",
+    "Mn",
+    "Na",
+    "Os",
+    "Pd",
+    "Pt",
+    "Re",
+    "Si",
+    "Ti",
+    "U",
+    "V",
+    "W",
+    "Xe",
+    "Y",
+    "Zr",
 ]
 
 
@@ -151,6 +174,7 @@ def parse_bestcorr(text: str) -> float | None:
 # Filesystem scanners
 # ---------------------------------------------------------------------------
 
+
 def scan_sqs(files_dir: Path) -> list[dict]:
     sqs_root = files_dir / "SQS"
     results = []
@@ -172,28 +196,32 @@ def scan_sqs(files_dir: Path) -> list[dict]:
                 with contextlib.suppress(OSError):
                     obj = parse_bestcorr(bestcorr.read_text(errors="ignore"))
                 bestsqs = parent_dir / f"bestsqs{ip_str}.out"
-                runs.append({
-                    "ip": ip,
-                    "subdir": str(rel),
-                    "bestcorr_path": str(bestcorr),
-                    "bestsqs_path": str(bestsqs) if bestsqs.exists() else None,
-                    "objective": obj,
-                    "mtime": bestcorr.stat().st_mtime,
-                })
+                runs.append(
+                    {
+                        "ip": ip,
+                        "subdir": str(rel),
+                        "bestcorr_path": str(bestcorr),
+                        "bestsqs_path": str(bestsqs) if bestsqs.exists() else None,
+                        "objective": obj,
+                        "mtime": bestcorr.stat().st_mtime,
+                    }
+                )
         final = sqs_dir / "bestsqs.out"
         done = final.exists()
         active_comp = None
         if runs:
             latest = max(runs, key=lambda r: r["mtime"])
             active_comp = latest["subdir"]
-        results.append({
-            "name": sqs_dir.name,
-            "path": str(sqs_dir),
-            "runs": runs,
-            "done": done,
-            "final_path": str(final) if done else None,
-            "active_comp": active_comp,
-        })
+        results.append(
+            {
+                "name": sqs_dir.name,
+                "path": str(sqs_dir),
+                "runs": runs,
+                "done": done,
+                "final_path": str(final) if done else None,
+                "active_comp": active_comp,
+            }
+        )
     return results
 
 
@@ -211,17 +239,19 @@ def scan_comps(files_dir: Path, comps_folder: str = "Comps") -> list[dict]:
         final_traj = sorted(comp_dir.rglob("relaxation_final.xyz"), key=lambda p: p.stat().st_mtime, reverse=True)
         live_traj = sorted(comp_dir.rglob("relaxation_live.xyz"), key=lambda p: p.stat().st_mtime, reverse=True)
         traj_files = final_traj + live_traj
-        results.append({
-            "name": comp_dir.name,
-            "path": str(comp_dir),
-            "tdb_done": bool(tdb_files),
-            "tdb_files": [str(f) for f in tdb_files],
-            "energy_count": len(energy_files),
-            "has_trajectory": bool(traj_files),
-            "trajectory_paths": [str(f) for f in traj_files],
-            "contcar_paths": [str(f) for f in contcar_files],
-            "mtime": comp_dir.stat().st_mtime,
-        })
+        results.append(
+            {
+                "name": comp_dir.name,
+                "path": str(comp_dir),
+                "tdb_done": bool(tdb_files),
+                "tdb_files": [str(f) for f in tdb_files],
+                "energy_count": len(energy_files),
+                "has_trajectory": bool(traj_files),
+                "trajectory_paths": [str(f) for f in traj_files],
+                "contcar_paths": [str(f) for f in contcar_files],
+                "mtime": comp_dir.stat().st_mtime,
+            }
+        )
     return results
 
 
@@ -229,13 +259,15 @@ def scan_plots(files_dir: Path) -> list[dict]:
     plots = []
     for ext in ("*.png", "*.gif"):
         for f in sorted(files_dir.rglob(ext)):
-            plots.append({
-                "name": f.name,
-                "path": str(f),
-                "rel": str(f.relative_to(files_dir)),
-                "mtime": f.stat().st_mtime,
-                "size": f.stat().st_size,
-            })
+            plots.append(
+                {
+                    "name": f.name,
+                    "path": str(f),
+                    "rel": str(f.relative_to(files_dir)),
+                    "mtime": f.stat().st_mtime,
+                    "size": f.stat().st_size,
+                }
+            )
     plots.sort(key=lambda x: x["mtime"], reverse=True)
     return plots
 
@@ -280,11 +312,13 @@ def scan_energy(comp_path: Path) -> list[dict]:
     for energy_file in sorted(comp_path.rglob("energy")):
         with contextlib.suppress(OSError, ValueError, IndexError):
             val = float(energy_file.read_text().strip().split()[0])
-            results.append({
-                "path": str(energy_file),
-                "energy": val,
-                "rel": str(energy_file.relative_to(comp_path)),
-            })
+            results.append(
+                {
+                    "path": str(energy_file),
+                    "energy": val,
+                    "rel": str(energy_file.relative_to(comp_path)),
+                }
+            )
     return results
 
 

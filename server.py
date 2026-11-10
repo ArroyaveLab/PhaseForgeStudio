@@ -247,7 +247,11 @@ class StudioHandler(BaseHTTPRequestHandler):
             self._json(get_live_structure(_resolve(self.cfg, "path1")))
 
         elif path in ("/blade", "/blade/", "/blade/index.html"):
-            blade_root = _resolve(self.cfg, "path1") if self.cfg.get("active_workspace") == "blade" else Path(self.cfg.get("blade_path1", "")).expanduser().resolve()
+            blade_root = (
+                _resolve(self.cfg, "path1")
+                if self.cfg.get("active_workspace") == "blade"
+                else Path(self.cfg.get("blade_path1", "")).expanduser().resolve()
+            )
             blade_idx = blade_root / "dashboard" / "index.html"
             if not blade_idx.is_file():
                 self._json({"error": "BLADE dashboard not found — set blade_path1 in config"}, 404)
@@ -263,12 +267,12 @@ class StudioHandler(BaseHTTPRequestHandler):
         elif path.startswith("/blade/api/"):
             blade_root = Path(self.cfg.get("blade_path1", "")).expanduser().resolve()
             files_dir = blade_root / "Files"
-            blade_path = path[len("/blade"):]  # strip /blade prefix → /api/...
+            blade_path = path[len("/blade") :]  # strip /blade prefix → /api/...
             blade_qs = qs
 
             if blade_path == "/api/status":
-                sqs   = _blade_cached("sqs",    4,  lambda: scan_sqs(files_dir))
-                comps = _blade_cached("comps",  4,  lambda: scan_comps(files_dir))
+                sqs = _blade_cached("sqs", 4, lambda: scan_sqs(files_dir))
+                comps = _blade_cached("comps", 4, lambda: scan_comps(files_dir))
                 stages = _blade_cached("stages", 4, lambda: infer_stage_status(files_dir))
                 self._json({"stages": stages, "sqs": sqs, "systems": comps, "timestamp": time.time()})
 
@@ -334,15 +338,17 @@ class StudioHandler(BaseHTTPRequestHandler):
                 result = find_live_trajectory(files_dir, blade_root)
                 if result and result.get("path"):
                     p = Path(result["path"])
-                    self._json({
-                        "xyz": p.read_text(errors="ignore"),
-                        "path": result["path"],
-                        "mtime": result["mtime"],
-                        "live": result.get("live", True),
-                        "nsteps": result.get("nsteps"),
-                        "converged": result.get("converged"),
-                        "composition": p.parent.name,
-                    })
+                    self._json(
+                        {
+                            "xyz": p.read_text(errors="ignore"),
+                            "path": result["path"],
+                            "mtime": result["mtime"],
+                            "live": result.get("live", True),
+                            "nsteps": result.get("nsteps"),
+                            "converged": result.get("converged"),
+                            "composition": p.parent.name,
+                        }
+                    )
                 else:
                     self._json({"xyz": None, "path": None, "search_dirs": (result or {}).get("_search_dirs", [])})
 
@@ -351,13 +357,15 @@ class StudioHandler(BaseHTTPRequestHandler):
                 self._json({"lines": read_log_tail(log_path if log_path.exists() else None)})
 
             elif blade_path == "/api/config":
-                self._json({
-                    "files_dir": str(files_dir),
-                    "blade_root": str(blade_root),
-                    "elements": {},
-                    "tdb": {},
-                    "stages": {},
-                })
+                self._json(
+                    {
+                        "files_dir": str(files_dir),
+                        "blade_root": str(blade_root),
+                        "elements": {},
+                        "tdb": {},
+                        "stages": {},
+                    }
+                )
 
             else:
                 self._json({"error": "not found"}, 404)
