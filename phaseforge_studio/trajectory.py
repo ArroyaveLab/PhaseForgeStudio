@@ -7,6 +7,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from phaseforge_studio.structure import _atoms_to_xyz, _positions_to_poscar
+
 
 def _parse_xyz_step_energies(xyz_path: Path) -> list[float] | None:
     """Return per-frame eV/atom energies from a multi-frame extxyz file, or None."""
@@ -32,8 +34,6 @@ def _parse_xyz_step_energies(xyz_path: Path) -> list[float] | None:
         except (ValueError, ZeroDivisionError):
             continue
     return energies if energies else None
-
-from phaseforge_studio.structure import _atoms_to_xyz, _positions_to_poscar
 
 
 def _split_xyz_frames(text: str) -> list[str]:
