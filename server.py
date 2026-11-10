@@ -326,6 +326,21 @@ class StudioHandler(BaseHTTPRequestHandler):
                     errors.append(str(e))
             self._json({"ok": not errors, "deleted": deleted, "errors": errors})
 
+        elif path == "/api/switch_workspace":
+            try:
+                body = json.loads(self._read_body())
+            except (json.JSONDecodeError, ValueError):
+                self._json({"error": "invalid JSON"}, 400)
+                return
+            workspace = body.get("workspace", "phaseforge")
+            if workspace not in ("phaseforge", "blade"):
+                self._json({"error": "unknown workspace"}, 400)
+                return
+            self.cfg["active_workspace"] = workspace
+            StudioHandler.cfg = self.cfg
+            _save_config(self.config_path, self.cfg)
+            self._json({"ok": True, "active_workspace": workspace})
+
         elif path == "/api/analyze":
             try:
                 params = json.loads(self._read_body())

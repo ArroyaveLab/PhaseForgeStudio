@@ -30,6 +30,8 @@ _default_config: dict[str, Any] = {
     "path0": "",
     "path1": "",
     "path2": "",
+    "blade_path1": "",
+    "active_workspace": "phaseforge",
     "device": "cpu",
 }
 
@@ -94,4 +96,7 @@ def _resolve(cfg: dict[str, Any], key: str) -> Path:
     Returns:
         Resolved absolute Path.
     """
-    return Path(cfg.get(key, _default_config[key])).expanduser().resolve()
+    effective_key = key
+    if key == "path1" and cfg.get("active_workspace") == "blade":
+        effective_key = "blade_path1"
+    return Path(cfg.get(effective_key, _default_config.get(effective_key, ""))).expanduser().resolve()
