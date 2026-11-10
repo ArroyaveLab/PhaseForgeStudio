@@ -107,7 +107,7 @@ def test_poscar_to_xyz_accepts_string() -> None:
 @pytest.fixture()
 def mock_sqs_tree(tmp_path: Path) -> Path:
     """Minimal SQS tree with 'energy' files for sort testing."""
-    sqs_root = tmp_path / "Files" / "SQS"
+    sqs_root = tmp_path / "Jobs" / "test_job" / "AlFeNi"
     dirs_energies = [
         ("sqs_lev=1_a_Al=0.5_a_Fe=0.5", -3.5),
         ("sqs_lev=1_a_Al=1.0", -3.2),
@@ -139,13 +139,13 @@ def test_scan_energies_sorted_consistently(mock_sqs_tree: Path) -> None:
 
 
 def test_scan_energies_empty_tree(tmp_path: Path) -> None:
-    (tmp_path / "Files" / "SQS").mkdir(parents=True)
+    (tmp_path / "Jobs").mkdir(parents=True)
     result = scan_energies(tmp_path)
     assert result == {"labels": [], "energies": []}
 
 
 def test_scan_energies_skips_malformed_energy(tmp_path: Path) -> None:
-    p = tmp_path / "Files" / "SQS" / "sqs_lev=1_a_Al=1.0"
+    p = tmp_path / "Jobs" / "test_job" / "Al" / "sqs_lev=1_a_Al=1.0"
     p.mkdir(parents=True)
     (p / "energy").write_text("not_a_float")
     result = scan_energies(tmp_path)
