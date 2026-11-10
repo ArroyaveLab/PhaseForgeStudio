@@ -117,23 +117,30 @@ def _phase_diagram_from_tdb(
         return []
     comps = all_els + ["VA"]
 
-    # N≥3: composition-space phase map only (matches BLADE phase_visualization.py)
+    # N≥3: animated GIF (one frame per temperature) + static overlay PNG
     if len(all_els) >= 3:
         sys_name = "".join(all_els)
+        t_step = max(100.0, (t_max - t_min) / 15)
+        gif_path = tdb_path.parent / f"{sys_name}_phase_map.gif"
         overlay_path = tdb_path.parent / f"{sys_name}_phase_map.png"
+        results: list[Path] = []
         try:
-            plotted = _plot_phase_overlay(
-                dbf,
-                all_els,
-                phases,
-                overlay_path,
-                t_start=t_min,
-                t_end=t_max,
-                t_step=max(100.0, (t_max - t_min) / 15),
-            )
-            return [overlay_path] if plotted else []
+            if _plot_phase_gif(
+                dbf, all_els, phases, gif_path,
+                t_start=t_min, t_end=t_max, t_step=t_step,
+            ):
+                results.append(gif_path)
         except Exception:
-            return []
+            pass
+        try:
+            if _plot_phase_overlay(
+                dbf, all_els, phases, overlay_path,
+                t_start=t_min, t_end=t_max, t_step=t_step,
+            ):
+                results.append(overlay_path)
+        except Exception:
+            pass
+        return results
 
     # Binary: single T-X phase diagram via pycalphad binplot
     t_step = max(5.0, (t_max - t_min) / 200)
@@ -442,6 +449,115 @@ def _plot_phase_overlay(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(str(out_path), dpi=200, bbox_inches="tight")
     plt.close(fig)
+    return True
+
+
+def _plot_phase_gif(
+    tdb: Any,
+    metals: list[str],
+    phases: list[str],
+    out_path: Path,
+    *,
+    t_start: float = 300.0,
+    t_end: float = 3000.0,
+    t_step: float = 300.0,
+    n_grid: int = 30,
+    fps: int = 6,
+) -> bool:
+    """Animated GIF of the composition-space phase map evolving over temperature.
+
+    One frame per temperature step, saved as a looping GIF via Pillow.
+
+    Args:
+        tdb: pycalphad Database object.
+        metals: Sorted list of variable element names.
+        phases: Phase names from TDB.
+        out_path: Output GIF path.
+        t_start: First temperature (K).
+        t_end: Final temperature (K).
+        t_step: Temperature increment (K).
+        n_grid: Grid density per simplex dimension.
+        fps: Frames per second for the GIF.
+
+    Returns:
+        True if at least one frame was rendered.
+    """
+    import io
+
+    import matplotlib
+    import matplotlib.colors as mcolors
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib import tri
+
+    try:
+        from PIL import Image
+    except ImportError:
+        return False
+
+    matplotlib.use("Agg")
+
+    t_arr = np.arange(t_start, t_end + 1, t_step, dtype=float)
+    if t_arr.size == 0 or t_arr[-1] < t_end - 0.5:
+        t_arr = np.append(t_arr, t_end)
+    t_arr = np.unique(t_arr)
+
+    all_comps = list(tdb.elements) + ["VA"]
+    phase_grid = _simplex_grid(len(metals), n_grid, x_total=1.0)
+    x_cart, y_cart = _compositions_to_xy(phase_grid, 1.0)
+    triang = tri.Triangulation(x_cart, y_cart)
+    triang = _mask_outside_simplex(triang, x_cart, y_cart, len(metals))
+
+    gmix_by_t = _compute_gmix_many(tdb, all_comps, metals, phases, temperatures=t_arr, grid=phase_grid)
+
+    cmap = plt.get_cmap("plasma")
+    norm = mcolors.Normalize(vmin=t_start, vmax=t_end)
+    label_str = "-".join(m.title() for m in metals)
+    frames: list[Image.Image] = []
+
+    for t_raw in t_arr:
+        t_k = int(t_raw)
+        g_mix = gmix_by_t.get(t_k)
+        if g_mix is None or np.isnan(g_mix).all():
+            continue
+
+        fig, ax = plt.subplots(figsize=(7, 6))
+        _draw_polygon_frame(ax, [m.title() for m in metals])
+
+        color = cmap(norm(t_k))
+        two_phase = _find_two_phase_mask(x_cart, y_cart, g_mix)
+        if two_phase.any():
+            shade = two_phase.astype(float)
+            ax.tricontourf(triang, shade, levels=[0.5, 1.5], colors=[color], alpha=0.5)
+            ax.tricontour(triang, shade, levels=[0.5], colors=[color], linewidths=1.5, alpha=1.0)
+            _clip_to_simplex(ax, len(metals))
+            note = "two-phase region shaded"
+        else:
+            note = "single phase"
+
+        ax.set_title(f"{label_str}  T = {t_k} K  ({note})", fontsize=11, fontweight="bold")
+        fig.tight_layout()
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=120, bbox_inches="tight")
+        plt.close(fig)
+        buf.seek(0)
+        frames.append(Image.open(buf).convert("RGBA"))
+
+    if not frames:
+        return False
+
+    duration_ms = max(80, int(1000 / fps))
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    frames[0].save(
+        str(out_path),
+        format="GIF",
+        save_all=True,
+        append_images=frames[1:],
+        loop=0,
+        duration=duration_ms,
+        disposal=2,
+    )
     return True
 
 
