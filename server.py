@@ -68,7 +68,9 @@ from phaseforge_studio.blade import (  # noqa: E402
     find_live_trajectory,
     infer_stage_status,
     parse_atat_structure,
+    patch_toml,
     read_log_tail,
+    read_toml_parsed,
     scan_compositions,
     scan_comps,
     scan_energy,
@@ -372,7 +374,6 @@ class StudioHandler(BaseHTTPRequestHandler):
                 if not rel:
                     self._json({"error": "missing path"}, 400)
                     return
-                # Resolve relative to blade_root; also accept absolute paths under blade_root
                 candidate = Path(rel)
                 if not candidate.is_absolute():
                     candidate = (blade_root / rel).resolve()
@@ -383,6 +384,20 @@ class StudioHandler(BaseHTTPRequestHandler):
                     self._json({"error": "not found"}, 404)
                     return
                 self._json({"content": candidate.read_text(errors="ignore"), "path": str(candidate)})
+
+            elif blade_path == "/api/toml_read":
+                rel = blade_qs.get("path", [""])[0]
+                if not rel:
+                    self._json({"error": "missing path"}, 400)
+                    return
+                candidate = Path(rel) if Path(rel).is_absolute() else (blade_root / rel).resolve()
+                if not str(candidate).startswith(str(blade_root)) or not candidate.is_file():
+                    self._json({"error": "not found"}, 404)
+                    return
+                try:
+                    self._json({"data": read_toml_parsed(candidate)})
+                except Exception as exc:
+                    self._json({"error": str(exc)}, 500)
 
             else:
                 self._json({"error": "not found"}, 404)
@@ -510,6 +525,31 @@ class StudioHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(body)
+
+        elif path == "/blade/api/toml_write":
+            try:
+                body = json.loads(self._read_body())
+            except (json.JSONDecodeError, ValueError):
+                self._json({"error": "invalid JSON"}, 400)
+                return
+            rel = body.get("path", "")
+            updates = body.get("updates", {})  # {section: {key: value}} or {"": {key: value}} for top-level
+            blade_root = Path(self.cfg.get("blade_path1", "")).expanduser().resolve()
+            candidate = Path(rel) if Path(rel).is_absolute() else (blade_root / rel).resolve()
+            if not str(candidate).startswith(str(blade_root)) or not candidate.is_file():
+                self._json({"error": "not found"}, 404)
+                return
+            try:
+                text = candidate.read_text(encoding="utf-8")
+                for section, kv in updates.items():
+                    for key, value in kv.items():
+                        text = patch_toml(text, section, key, value)
+                tmp = candidate.with_suffix(".tmp")
+                tmp.write_text(text, encoding="utf-8")
+                tmp.replace(candidate)
+                self._json({"ok": True})
+            except Exception as exc:
+                self._json({"error": str(exc)}, 500)
 
         else:
             self._json({"error": "not found"}, 404)

@@ -415,6 +415,52 @@ def find_live_trajectory(files_dir: Path | None, blade_root: Path | None = None)
     return {"_search_dirs": [str(d) for d in search_dirs]}
 
 
+def read_toml_parsed(toml_path: Path) -> dict:
+    """Read and parse a TOML file, returning a plain dict."""
+    import tomllib
+
+    with toml_path.open("rb") as f:
+        return tomllib.load(f)
+
+
+def patch_toml(text: str, section: str, key: str, value) -> str:
+    """Replace key = <old> with key = <new> inside [section] block, preserving comments."""
+    # Format value as TOML literal
+    if isinstance(value, bool):
+        toml_val = "true" if value else "false"
+    elif isinstance(value, str):
+        toml_val = f'"{value}"'
+    elif isinstance(value, list):
+        parts = []
+        for v in value:
+            parts.append(f'"{v}"' if isinstance(v, str) else str(v).lower() if isinstance(v, bool) else str(v))
+        toml_val = "[" + ", ".join(parts) + "]"
+    elif isinstance(value, float):
+        toml_val = str(value)
+    else:
+        toml_val = str(value)
+
+    if section:
+        # Find [section] header (not [[section]])
+        sec_pat = re.compile(rf"^(\[{re.escape(section)}\])", re.MULTILINE)
+        m = sec_pat.search(text)
+        if not m:
+            return text
+        sec_start = m.end()
+        # Find next [section] or [[section]] header
+        next_sec = re.compile(r"^\[", re.MULTILINE)
+        nm = next_sec.search(text, sec_start + 1)
+        sec_end = nm.start() if nm else len(text)
+        block = text[sec_start:sec_end]
+        key_pat = re.compile(rf"^({re.escape(key)}\s*=\s*).*", re.MULTILINE)
+        new_block = key_pat.sub(rf"\g<1>{toml_val}", block, count=1)
+        return text[:sec_start] + new_block + text[sec_end:]
+    else:
+        # Top-level key
+        key_pat = re.compile(rf"^({re.escape(key)}\s*=\s*).*", re.MULTILINE)
+        return key_pat.sub(rf"\g<1>{toml_val}", text, count=1)
+
+
 def serve_blade_index(blade_index_path: Path, toml_path: str = "") -> bytes:
     """Read BLADE's index.html and rewrite /api/ → /blade/api/ for all fetch calls.
 
