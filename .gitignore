@@ -20,6 +20,10 @@ PhaseForgePlus/
 lammps/
 new-models/
 
+# Pixi / studio local env
+.pixi
+studio
+
 # Misc
 *.log
 *.pkl
