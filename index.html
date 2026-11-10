@@ -2060,7 +2060,7 @@ async function loadPhaseDiagrams() {
   try {
     const r = await fetch("/api/outputs");
     const items = await r.json();
-    const pngs = items.filter(i => i.file_type === "png" && i.name.toLowerCase().includes("phase_diagram"));
+    const pngs = items.filter(i => i.file_type === "png");
     const grid = document.getElementById("phasediag-grid");
     const empty = document.getElementById("phasediag-empty");
     if (!pngs.length) {
